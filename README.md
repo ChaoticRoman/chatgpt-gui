@@ -21,6 +21,11 @@ pip install openai tkhtmlview
 
 ## Usage
 
+### API key
+
+Expects `.api_key` file in the repo directory with your OpenAI API key in there. Don't worry to contribute,
+the filename is in `.gitignore` already.
+
 ### CLI Client
 
 To use the CLI client, run the following command:
@@ -33,7 +38,7 @@ The CLI client will prompt you to enter your input. The response from ChatGPT wi
 
 Quit with either `q`, `x`, `exit` or `quit` as the input.
 
-### GUI Client
+### GUI Client (WIP)
 
 To use the GUI client, run the following command:
 

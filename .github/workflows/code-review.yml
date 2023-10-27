@@ -1,0 +1,21 @@
+name: Code Review
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: sshnaidm/gpt-code-review-action@v1.0
+        with:
+#          model: 'gpt-4-32k'
+          model: 'gpt-4'
+          openai-key: ${{ secrets.OPENAI_API_KEY }}
+#          max-length: 31800
+          max-length: 7800

@@ -16,7 +16,7 @@ The clients depend on the following Python packages:
 To install the dependencies, run the following command:
 
 ```bash
-pip install openai tkhtmlview
+pip install openai tkhtmlview tqdm
 ```
 
 ## Usage

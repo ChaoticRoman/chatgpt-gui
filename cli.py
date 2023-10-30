@@ -6,7 +6,10 @@ import core
 
 
 def cli_input():
-    return input("> ")
+    user_input = input("> ")
+    if user_input in ('q', 'x', 'quit', 'exit'):
+        return None
+    return user_input
 
 
 def cli_output(msg, info):

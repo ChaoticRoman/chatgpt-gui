@@ -4,10 +4,10 @@ from dataclasses import dataclass
 import openai
 
 MODEL = "gpt-4"
+TEMPERATURE = 0.0
 
-os.chdir(os.path.dirname(__file__))
-
-with open('.api_key', 'r') as f:
+api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
+with open(api_key_path, 'r') as f:
     openai.api_key = f.read().strip()
 
 
@@ -24,7 +24,7 @@ class GptCore:
             self.messages.append({"role": "user", "content": prompt})
 
             response = openai.ChatCompletion.create(
-                model=MODEL, messages=self.messages, temperature=0)
+                model=MODEL, messages=self.messages, temperature=TEMPERATURE)
 
             message = response.choices[0]["message"]
             self.messages.append(message)

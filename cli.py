@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import os
-import readline
+import readline  # noqa F401
 
 import core
 
@@ -38,9 +37,11 @@ def cli_output(msg, info):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Interact with OpenAI's GPT-4 model.")
-    parser.add_argument('-m', '--multiline', action='store_true',
-        help='Enable multiline input mode. Input "SEND" when you are done.')
+    parser = argparse.ArgumentParser(
+            description="Interact with OpenAI's GPT-4 model.")
+    parser.add_argument(
+            '-m', '--multiline', action='store_true',
+            help='Enable multiline input mode. Input "SEND" when you are done.')  # noqa E501
     args = parser.parse_args()
 
     if args.multiline:

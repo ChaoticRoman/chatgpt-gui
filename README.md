@@ -36,6 +36,9 @@ python cli.py
 
 The CLI client will prompt you to enter your input. The response from ChatGPT will be printed in the console.
 
+You can also enable multiline mode with the `-m` or `--multiline` option. In this mode, you can input multiple
+lines and input "SEND" when you are done.
+
 Quit with either `q`, `x`, `exit` or `quit` as the input.
 
 ### GUI Client (WIP)

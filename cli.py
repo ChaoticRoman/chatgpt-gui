@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+# importing readline adds history and navigation to input builtin
 import readline  # noqa F401
 
 import core

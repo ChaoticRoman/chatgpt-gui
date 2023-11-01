@@ -50,8 +50,9 @@ class GptCore:
             usage = response.usage
             prompt_tokens, completion_tokens = (
                 usage.prompt_tokens, usage.completion_tokens)
-            # GPT-4 prices in USD, source: https://openai.com/pricing#language-models
-            price += 0.03 / 1e3 * prompt_tokens + 0.06 / 1e3 * completion_tokens
+            # GPT-4 prices in USD, source:
+            # https://openai.com/pricing#language-models
+            price += 0.03 / 1e3 * prompt_tokens + 0.06 / 1e3 * completion_tokens  # noqa: E501
 
             self.output(content, Info(prompt_tokens, completion_tokens, price))
 

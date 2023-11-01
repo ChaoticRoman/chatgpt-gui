@@ -38,9 +38,9 @@ def cli_output(msg, info):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='')
+    parser = argparse.ArgumentParser(description="Interact with OpenAI's GPT-4 model.")
     parser.add_argument('-m', '--multiline', action='store_true',
-        help='Multiline mode, input SEND when you are happy.')
+        help='Enable multiline input mode. Input "SEND" when you are done.')
     args = parser.parse_args()
 
     if args.multiline:

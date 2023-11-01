@@ -12,6 +12,22 @@ with open(api_key_path, 'r') as f:
 
 
 class GptCore:
+    """
+    A class to interact with OpenAI's GPT-4 model.
+
+    Attributes
+    ----------
+    input : function
+        a function to get user input, takes no arguments, returns str or None
+    output : function
+        a function to output the model's response and info, takes str and Info
+        object, returns None
+
+    Methods
+    -------
+    main():
+        The main loop to interact with the model.
+    """
     def __init__(self, input, output):
         self.input = input
         self.output = output
@@ -42,6 +58,18 @@ class GptCore:
 
 @dataclass
 class Info:
+    """
+    A class to represent the information about the interaction with the model.
+
+    Attributes
+    ----------
+    prompt_tokens : int
+        the number of tokens in the prompt
+    completion_tokens : int
+        the number of tokens in the completion
+    price : float
+        the total price of the interaction
+    """
     prompt_tokens: int
     completion_tokens: int
     price: float

@@ -2,7 +2,7 @@
 import argparse
 # importing readline adds history and navigation to input builtin
 import readline  # noqa F401
-
+import asyncio
 import core
 
 
@@ -50,7 +50,9 @@ def main():
     else:
         input_f = cli_input
 
-    core.GptCore(input_f, cli_output).main()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(core.GptCore(input_f, cli_output).main())
+
 
 
 if __name__ == "__main__":

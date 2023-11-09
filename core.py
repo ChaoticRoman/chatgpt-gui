@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 
 import openai
+import asyncio
+from tqdm import tqdm
 
 MODEL = "gpt-4"
 TEMPERATURE = 0.0
@@ -34,14 +36,26 @@ class GptCore:
 
         self.messages = []
 
-    def main(self):
+    async def main(self):
         price = 0
         while prompt := self.input():
             self.messages.append({"role": "user", "content": prompt})
 
-            response = openai.ChatCompletion.create(
-                model=MODEL, messages=self.messages, temperature=TEMPERATURE)
+            loop = asyncio.get_running_loop()
+            response_future = loop.run_in_executor(None, lambda: openai.ChatCompletion.create(
+                model=MODEL, messages=self.messages, temperature=TEMPERATURE))
 
+            pbar = tqdm(total=1, bar_format='{desc}', position=0, leave=True)
+            x = 0
+            while not response_future.done():
+                pbar.set_description_str("." * x, refresh=True)
+                x += 1
+                await asyncio.sleep(0.5)
+
+            pbar.close()
+            await response_future
+
+            response = response_future.result()
             message = response.choices[0]["message"]
             self.messages.append(message)
 

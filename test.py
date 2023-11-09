@@ -8,7 +8,7 @@ MODEL = "gpt-4"
 os.chdir(os.path.dirname(__file__))
 
 with open('.api_key', 'r') as f:
-    openai.api_key = f.read().strip()
+    client = openai.OpenAI(api_key=f.read().strip())
 
 prompt = " ".join(sys.argv[1:])
 
@@ -23,7 +23,7 @@ messages = [
         # ... And model would proceed with "Orange who?"
 ]
 
-response = openai.ChatCompletion.create(
+response = client.chat.completions.create(
         model=MODEL, messages=messages, temperature=0.1)
 
-print(response.choices[0]["message"]["content"].strip())
+print(response.choices[0].message.content.strip())

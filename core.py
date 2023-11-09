@@ -6,9 +6,10 @@ import openai
 MODEL = "gpt-4"
 TEMPERATURE = 0.0
 
-api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
-with open(api_key_path, 'r') as f:
-    openai.api_key = f.read().strip()
+if 'OPENAI_API_KEY' not in os.environ:
+    api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
+    with open(api_key_path, 'r') as f:
+        os.environ['OPENAI_API_KEY'] = f.read().strip()
 
 
 class GptCore:
@@ -34,18 +35,20 @@ class GptCore:
 
         self.messages = []
 
+        self.client = openai.OpenAI()
+
     def main(self):
         price = 0
         while prompt := self.input():
             self.messages.append({"role": "user", "content": prompt})
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=MODEL, messages=self.messages, temperature=TEMPERATURE)
 
-            message = response.choices[0]["message"]
+            message = response.choices[0].message
             self.messages.append(message)
 
-            content = message["content"].strip()
+            content = message.content.strip()
 
             usage = response.usage
             prompt_tokens, completion_tokens = (

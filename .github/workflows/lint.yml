@@ -1,27 +1,15 @@
-name: Flake8 and Ruff
+name: Ruff
 
 on:
   pull_request:
     branches: [ main ]
 
 jobs:
-  flake8_py3:
+  ruff:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-      - name: Install flake8
-        run: pip install flake8
-      - name: Run flake8
-        uses: ChaoticRoman/flake8-github-action@update-node
-        with:
-          checkName: 'flake8_py3'   # NOTE: this needs to be the same as the job name
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run ruff
         uses: chartboost/ruff-action@v1.0.0
         with:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import openai
-import os
 import sys
 
 import core

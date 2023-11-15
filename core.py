@@ -6,6 +6,7 @@ import openai
 MODEL = "gpt-4"
 TEMPERATURE = 0.0
 
+
 def load_key():
     if 'OPENAI_API_KEY' not in os.environ:
         api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')

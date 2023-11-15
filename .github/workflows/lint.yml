@@ -17,7 +17,7 @@ jobs:
       - name: Install flake8
         run: pip install flake8
       - name: Run flake8
-        uses: ChaoticRoman/flake8-github-action@releases/v1.0.1
+        uses: ChaoticRoman/flake8-github-action@v1.0.1
         with:
           checkName: 'flake8_py3'   # NOTE: this needs to be the same as the job name
         env:

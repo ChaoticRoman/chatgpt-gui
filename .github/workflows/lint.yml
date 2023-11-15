@@ -24,4 +24,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run ruff
         uses: chartboost/ruff-action@v1.0.0
-        args: check --diff -v .
+        with:
+          args: check --diff -v .

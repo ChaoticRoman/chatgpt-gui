@@ -35,7 +35,7 @@ class ChatApp:
         self.chat_history.configure(state='disabled')
 
         # Scroll to the bottom of the chat history
-        self.chat_history.yview(tk.END)
+            self.chat_history.yview(tk.END)
 
 root = tk.Tk()
 app = ChatApp(root)

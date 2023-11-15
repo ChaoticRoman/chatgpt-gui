@@ -1,9 +1,8 @@
 name: Flake8 and Ruff
 
 on:
-  push:
-    paths:
-      - '*.py'
+  pull_request:
+    branches: [ main ]
 
 jobs:
   flake8_py3:

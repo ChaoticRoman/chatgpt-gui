@@ -6,10 +6,11 @@ import openai
 MODEL = "gpt-4"
 TEMPERATURE = 0.0
 
-if 'OPENAI_API_KEY' not in os.environ:
-    api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
-    with open(api_key_path, 'r') as f:
-        os.environ['OPENAI_API_KEY'] = f.read().strip()
+def load_key():
+    if 'OPENAI_API_KEY' not in os.environ:
+        api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
+        with open(api_key_path, 'r') as f:
+            os.environ['OPENAI_API_KEY'] = f.read().strip()
 
 
 class GptCore:

@@ -3,12 +3,12 @@ import openai
 import os
 import sys
 
+import core
+
 MODEL = "gpt-4"
 
-os.chdir(os.path.dirname(__file__))
-
-with open('.api_key', 'r') as f:
-    client = openai.OpenAI(api_key=f.read().strip())
+core.load_key()
+client = openai.OpenAI()
 
 prompt = " ".join(sys.argv[1:])
 

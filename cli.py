@@ -50,6 +50,7 @@ def main():
     else:
         input_f = cli_input
 
+    core.load_key()
     core.GptCore(input_f, cli_output).main()
 
 

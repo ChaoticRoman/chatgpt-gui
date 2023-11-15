@@ -63,7 +63,7 @@ class GptCore:
 @dataclass
 class Info:
     """
-    A class to represent the information about the interaction with the model.
+    A class representing the information about the interaction with the model.
 
     Attributes
     ----------

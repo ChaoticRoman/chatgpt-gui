@@ -9,14 +9,13 @@ to run the commands.
 The clients depend on the following Python packages:
 
 - `openai`: This package is used to interact with the OpenAI API and send requests to the ChatGPT model.
-- `tkhtmlview`: This package is used in the GUI client to display the chat history in a user-friendly format.
 
 ## Installation
 
 To install the dependencies, run the following command:
 
 ```bash
-pip install openai tkhtmlview
+pip install openai
 ```
 
 ## Usage
@@ -40,16 +39,6 @@ You can also enable multiline mode with the `-m` or `--multiline` option. In thi
 lines and input "SEND" when you are done.
 
 Quit with either `q`, `x`, `exit` or `quit` as the input.
-
-### GUI Client (WIP)
-
-To use the GUI client, run the following command:
-
-```bash
-python gui.py
-```
-
-The GUI client will open a new window where you can enter your input and see the responses from ChatGPT.
 
 ## Contributing
 

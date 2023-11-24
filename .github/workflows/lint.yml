@@ -13,4 +13,4 @@ jobs:
       - name: Run ruff
         uses: chartboost/ruff-action@v1.0.0
         with:
-          args: check -v .
+          args: check -v --show-source .

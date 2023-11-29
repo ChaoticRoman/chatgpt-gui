@@ -13,8 +13,9 @@ def check_exit(user_input):
 def cli_input():
     try:
         user_input = input("> ")
-    except (KeyboardInterrupt, EOFError): # We can add a print command here if you'd like
-        pass
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return None
     else:
         if check_exit(user_input):
             return None
@@ -26,9 +27,10 @@ def cli_input_multiline():
     while True:
         try:
             line = input("> ")
-        except (KeyboardInterrupt, EOFError): # We can add a print command here if you'd like
-            pass
-            break
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return None
+
         else:
             if line == "SEND":
                 break

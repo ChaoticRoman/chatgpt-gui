@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+
 # importing readline adds history and navigation to input builtin
 import readline  # noqa F401
 
@@ -7,7 +8,7 @@ import core
 
 
 def check_exit(user_input):
-    return user_input in ('q', 'x', 'quit', 'exit')
+    return user_input in ("q", "x", "quit", "exit")
 
 
 def cli_input():
@@ -36,13 +37,12 @@ def cli_input_multiline():
                 break
             user_input.append(line)
 
-    user_input = '\n'.join(user_input)
+    user_input = "\n".join(user_input)
 
     if check_exit(user_input):
         return None
 
     return user_input
-
 
 
 def cli_output(msg, info):
@@ -51,11 +51,13 @@ def cli_output(msg, info):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-            description="Interact with OpenAI's GPT-4 model.")
+    parser = argparse.ArgumentParser(description="Interact with OpenAI's GPT-4 model.")
     parser.add_argument(
-            '-m', '--multiline', action='store_true',
-            help='Enable multiline input mode. Input "SEND" when you are done.')  # noqa E501
+        "-m",
+        "--multiline",
+        action="store_true",
+        help='Enable multiline input mode. Input "SEND" when you are done.',
+    )
     args = parser.parse_args()
 
     if args.multiline:

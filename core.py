@@ -14,10 +14,10 @@ TEMPERATURE = 0.1
 
 
 def load_key():
-    if 'OPENAI_API_KEY' not in os.environ:
-        api_key_path = os.path.join(os.path.dirname(__file__), '.api_key')
-        with open(api_key_path, 'r') as f:
-            os.environ['OPENAI_API_KEY'] = f.read().strip()
+    if "OPENAI_API_KEY" not in os.environ:
+        api_key_path = os.path.join(os.path.dirname(__file__), ".api_key")
+        with open(api_key_path, "r") as f:
+            os.environ["OPENAI_API_KEY"] = f.read().strip()
 
 
 class GptCore:
@@ -37,6 +37,7 @@ class GptCore:
     main():
         The main loop to interact with the model.
     """
+
     def __init__(self, input, output):
         self.input = input
         self.output = output
@@ -51,7 +52,8 @@ class GptCore:
             self.messages.append({"role": "user", "content": prompt})
 
             response = self.client.chat.completions.create(
-                model=MODEL, messages=self.messages, temperature=TEMPERATURE)
+                model=MODEL, messages=self.messages, temperature=TEMPERATURE
+            )
 
             message = response.choices[0].message
             self.messages.append(message)
@@ -60,7 +62,9 @@ class GptCore:
 
             usage = response.usage
             prompt_tokens, completion_tokens = (
-                usage.prompt_tokens, usage.completion_tokens)
+                usage.prompt_tokens,
+                usage.completion_tokens,
+            )
 
             price += USD_PER_INPUT_TOKEN * prompt_tokens
             price += USD_PER_OUTPUT_TOKEN * completion_tokens
@@ -82,12 +86,14 @@ class Info:
     price : float
         the total price of the interaction
     """
+
     prompt_tokens: int
     completion_tokens: int
     price: float
 
     def __repr__(self):
         return (
-            f'Prompt tokens: {self.prompt_tokens}, '
-            f'Completion tokens: {self.completion_tokens}, '
-            f'Total price: {self.price:.3f} USD')
+            f"Prompt tokens: {self.prompt_tokens}, "
+            f"Completion tokens: {self.completion_tokens}, "
+            f"Total price: {self.price:.3f} USD"
+        )

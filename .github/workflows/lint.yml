@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  ruff:
+  ruff-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -14,3 +14,12 @@ jobs:
         uses: chartboost/ruff-action@v1.0.0
         with:
           args: check -v --show-source .
+  ruff-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run ruff
+        uses: chartboost/ruff-action@v1.0.0
+        with:
+          args: format --diff .

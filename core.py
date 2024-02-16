@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import openai
 
-MODEL = "gpt-4-0125-preview"
+MODEL = "gpt-4-turbo-preview"
 
 # GPT-4 prices in USD, source:
 # https://openai.com/pricing#language-models

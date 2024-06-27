@@ -22,4 +22,6 @@ message = client.messages.create(
         }
     ]
 )
-print(message.content)
+answer = message.to_dict()["content"][0]["text"]
+
+print(answer)

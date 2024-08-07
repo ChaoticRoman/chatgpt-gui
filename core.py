@@ -3,12 +3,12 @@ from dataclasses import dataclass
 
 import openai
 
-MODEL = "gpt-4o"
+MODEL = "gpt-4o-2024-08-06"
 
 # GPT-4o prices in USD, source:
-# https://openai.com/pricing#language-models
-USD_PER_INPUT_TOKEN = 5e-6
-USD_PER_OUTPUT_TOKEN = 15e-6
+# https://openai.com/api/pricing/
+USD_PER_INPUT_TOKEN = 2.5e-6
+USD_PER_OUTPUT_TOKEN = 10e-6
 
 TEMPERATURE = 0.1
 

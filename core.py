@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import openai
 
-MODEL = "gpt-4o-2024-08-06"
+MODEL = "chatgpt-4o-latest"
 
 # GPT-4o prices in USD, source:
 # https://openai.com/api/pricing/

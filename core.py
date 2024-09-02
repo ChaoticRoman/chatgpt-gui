@@ -1,5 +1,8 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+import json
+from datetime import datetime as dt
 
 import openai
 
@@ -11,6 +14,8 @@ USD_PER_INPUT_TOKEN = 2.5e-6
 USD_PER_OUTPUT_TOKEN = 10e-6
 
 TEMPERATURE = 0.1
+
+DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
 
 
 def load_key():
@@ -44,6 +49,10 @@ class GptCore:
 
         self.messages = []
 
+        timestamp = dt.now().replace(microsecond=0).isoformat()
+        os.makedirs(DATA_DIRECTORY, exist_ok=True)
+        self.file = DATA_DIRECTORY / f"{timestamp}.json"
+
         self.client = openai.OpenAI()
 
     def main(self):
@@ -57,6 +66,9 @@ class GptCore:
 
             message = response.choices[0].message
             self.messages.append(message)
+            serialized = [dict(m) for m in self.messages]
+            with open(self.file, "w") as f:
+                json.dump(serialized, f, sort_keys=True, indent=4)
 
             content = message.content.strip()
 

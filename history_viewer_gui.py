@@ -1,14 +1,12 @@
+#!/usr/bin/env python3
 import os
 import json
 import tkinter as tk
-from tkinter import Listbox, Scrollbar, Text, END, RIGHT, Y, LEFT, BOTH
-import html
+from tkinter import Listbox, Scrollbar, END, RIGHT, Y, LEFT, BOTH
 
 from tkinterweb import HtmlFrame
-from misaka import Markdown, HtmlRenderer
-from pygments import highlight
-from pygments.formatters import HtmlFormatter, ClassNotFound
-from pygments.lexers import get_lexer_by_name
+from mistletoe import markdown
+from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
 from core import DATA_DIRECTORY
 
@@ -42,14 +40,11 @@ class JsonViewerApp(tk.Tk):
         # Bind the listbox selection event to a function
         self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
 
-        self.md = Markdown(HighlighterRenderer(), extensions=('fenced-code',))
-
     def load_json_files(self):
         """Load the list of JSON files from the hardcoded folder."""
         if os.path.exists(DATA_DIRECTORY):
             json_files = sorted(
                 [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")])
-            print(json_files[-1])
             for file in json_files:
                 self.file_listbox.insert(END, file)
         else:
@@ -67,30 +62,20 @@ class JsonViewerApp(tk.Tk):
 
             with open(file_path, "r") as file:
                 file_content = json.load(file)
-                formatted_content = self.md(format_json(file_content))
-                # print(formatted_content)
+                formatted_content = markdown(format_json(file_content), CustomPygmentsRenderer)
                 self.file_content_text.load_html(formatted_content)
-
-
-class HighlighterRenderer(HtmlRenderer):
-    def blockcode(self, text, lang):
-        try:
-            lexer = get_lexer_by_name(lang, stripall=True)
-        except ClassNotFound:
-            lexer = None
-
-        if lexer:
-            formatter = HtmlFormatter(full=True, wrapcode=True, nobackground=False,
-                                      style="xcode", prestyles="font-family: monospace")
-            return highlight(text, lexer, formatter)
-        # default
-        return '\n<pre style="font-family: monospace">{}</pre>\n'.format(
-                            html.escape(text.strip()))
 
 
 def format_json(j):
     return "\n\n".join(
         [f"**{m["role"].upper()}:**\n\n{m["content"]}" for m in j])
+
+
+class CustomPygmentsRenderer(PygmentsRenderer):
+    def __init__(self):
+        self.formatter.nobackground = True
+        self.formatter.prestyles = "font-family: monospace, monospace; font-weight: 500"
+        super().__init__()
 
 
 if __name__ == "__main__":

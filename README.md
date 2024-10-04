@@ -40,6 +40,10 @@ lines and input "SEND" when you are done.
 
 Quit with either `q`, `x`, `exit` or `quit` as the input.
 
+### GUI Client
+
+For now, GUI client is just a browser of past conversations with nice rendering.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request.

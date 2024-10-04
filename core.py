@@ -47,6 +47,8 @@ class GptCore:
         self.input = input
         self.output = output
 
+        load_key()
+
         self.messages = []
 
         timestamp = dt.now().replace(microsecond=0).isoformat()

@@ -4,7 +4,9 @@ import sys
 
 import core
 
-MODEL = "gpt-4"
+MODEL = "gpt-4o-2024-08-06"
+MODEL = "o1-preview"
+MODEL = "chatgpt-4o-latest"
 
 core.load_key()
 client = openai.OpenAI()
@@ -23,7 +25,10 @@ messages = [
 ]
 
 response = client.chat.completions.create(
-    model=MODEL, messages=messages, temperature=0.1
+    model=MODEL,
+    messages=messages,
 )
 
+print(response.model)
 print(response.choices[0].message.content.strip())
+print(response.usage)

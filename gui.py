@@ -40,8 +40,6 @@ class JsonViewerApp(tk.Tk):
         # Bind the listbox selection event to a function
         self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
 
-        # Killing with CTRL+C in the app
-        self.bind_all("<Control-c>", lambda _: self.destroy())
         # Killing with CTRL+C in the console
         self.check()
 

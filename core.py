@@ -6,14 +6,11 @@ from datetime import datetime as dt
 
 import openai
 
-MODEL = "chatgpt-4o-latest"
+MODEL = "o1-preview"
 
-# GPT-4o prices in USD, source:
-# https://openai.com/api/pricing/
-USD_PER_INPUT_TOKEN = 2.5e-6
-USD_PER_OUTPUT_TOKEN = 10e-6
-
-TEMPERATURE = 0.1
+# Prices in USD, source: https://openai.com/api/pricing/
+USD_PER_INPUT_TOKEN = 15e-6
+USD_PER_OUTPUT_TOKEN = 60e-6
 
 DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
 
@@ -61,7 +58,7 @@ class GptCore:
             self.messages.append({"role": "user", "content": prompt})
 
             response = self.client.chat.completions.create(
-                model=MODEL, messages=self.messages, temperature=TEMPERATURE
+                model=MODEL, messages=self.messages
             )
 
             message = response.choices[0].message

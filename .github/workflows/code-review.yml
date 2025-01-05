@@ -11,8 +11,8 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: sshnaidm/gpt-code-review-action@v2.0
+      - uses: actions/checkout@v4
+      - uses: ChaoticRoman/gpt-code-review-action@v6
         with:
           model: 'gpt-4o'
           openai-key: ${{ secrets.OPENAI_API_KEY }}

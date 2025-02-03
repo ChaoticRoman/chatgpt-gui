@@ -12,8 +12,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: ChaoticRoman/gpt-code-review-action@v6
+      - uses: ChaoticRoman/gpt-code-review-action@v8
         with:
-          model: 'gpt-4o'
+          model: 'o3-mini'
           openai-key: ${{ secrets.OPENAI_API_KEY }}
           max-length: 50000

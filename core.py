@@ -6,7 +6,7 @@ from datetime import datetime as dt
 
 import openai
 
-MODEL = "o1-preview"
+MODEL = "o1"
 
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = 15e-6

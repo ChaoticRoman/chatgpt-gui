@@ -77,7 +77,7 @@ class JsonViewerApp(tk.Tk):
 
 
 def format_json(j):
-    return "\n\n".join([f"**{m["role"].upper()}:**\n\n{m["content"]}" for m in j])
+    return "\n\n".join([f"**{m['role'].upper()}:**\n\n{m['content']}" for m in j])
 
 
 class CustomPygmentsRenderer(PygmentsRenderer):

@@ -58,6 +58,11 @@ def main():
         action="store_true",
         help='Enable multiline input mode. Input "SEND" when you are done.',
     )
+    parser.add_argument(
+        "--o3-mini",
+        action="store_true",
+        help="Use o3-mini instead of o1.",
+    )
     args = parser.parse_args()
 
     if args.multiline:
@@ -65,8 +70,10 @@ def main():
     else:
         input_f = cli_input
 
+    model = "o3-mini" if args.o3_mini else "o1"
+
     core.load_key()
-    core.GptCore(input_f, cli_output).main()
+    core.GptCore(input_f, cli_output, model=model).main()
 
 
 if __name__ == "__main__":

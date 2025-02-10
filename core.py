@@ -7,10 +7,11 @@ from datetime import datetime as dt
 import openai
 
 MODEL = "o1"
+EFFORT = "high"
 
 # Prices in USD, source: https://openai.com/api/pricing/
-USD_PER_INPUT_TOKEN = 15e-6
-USD_PER_OUTPUT_TOKEN = 60e-6
+USD_PER_INPUT_TOKEN = {"o1": 15e-6, "o3-mini": 1.1e-6}
+USD_PER_OUTPUT_TOKEN = {"o1": 60e-6, "o3-mini": 4.4e-6}
 
 DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
 
@@ -40,9 +41,10 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output):
+    def __init__(self, input, output, model=MODEL):
         self.input = input
         self.output = output
+        self.model = model
 
         self.messages = []
 
@@ -58,7 +60,7 @@ class GptCore:
             self.messages.append({"role": "user", "content": prompt})
 
             response = self.client.chat.completions.create(
-                model=MODEL, messages=self.messages
+                model=self.model, messages=self.messages, reasoning_effort=EFFORT
             )
 
             message = response.choices[0].message
@@ -75,8 +77,11 @@ class GptCore:
                 usage.completion_tokens,
             )
 
-            price += USD_PER_INPUT_TOKEN * prompt_tokens
-            price += USD_PER_OUTPUT_TOKEN * completion_tokens
+            if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
+                price += USD_PER_INPUT_TOKEN[self.model] * prompt_tokens
+                price += USD_PER_OUTPUT_TOKEN[self.model] * completion_tokens
+            else:
+                price = "N/A"
 
             self.output(content, Info(prompt_tokens, completion_tokens, price))
 

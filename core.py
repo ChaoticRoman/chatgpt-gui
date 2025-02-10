@@ -6,7 +6,7 @@ from datetime import datetime as dt
 
 import openai
 
-MODEL = "o1"
+MODEL = "o3-mini"
 EFFORT = "high"
 
 # Prices in USD, source: https://openai.com/api/pricing/

@@ -6,6 +6,8 @@ import readline  # noqa F401
 
 import core
 
+DEFAULT_MODEL = "gpt-5"
+
 
 def check_exit(user_input):
     return user_input in ("q", "x", "quit", "exit")
@@ -61,8 +63,8 @@ def main():
     parser.add_argument(
         "-M",
         "--model",
-        default="o3-mini",
-        help="Use different model than o3-mini.",
+        default=DEFAULT_MODEL,
+        help=f"Use different model than {DEFAULT_MODEL}",
     )
     args = parser.parse_args()
 

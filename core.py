@@ -6,12 +6,23 @@ from datetime import datetime as dt
 
 import openai
 
-MODEL = "o3-mini"
-EFFORT = "high"
-
 # Prices in USD, source: https://openai.com/api/pricing/
-USD_PER_INPUT_TOKEN = {"o1": 15e-6, "o3-mini": 1.1e-6}
-USD_PER_OUTPUT_TOKEN = {"o1": 60e-6, "o3-mini": 4.4e-6}
+USD_PER_INPUT_TOKEN = {
+    "o1": 15e-6,
+    "o3-pro": 20e-6,
+    "o3-mini": 1.1e-6,
+    "o4-mini": 1.1e-6,
+    "gpt-4.5-preview": 75e-6,
+    "gpt-5": 1.25e-6,
+}
+USD_PER_OUTPUT_TOKEN = {
+    "o1": 60e-6,
+    "o3-pro": 80e-6,
+    "o3-mini": 4.4e-6,
+    "o4-mini": 4.4e-6,
+    "gpt-4.5-preview": 150e-6,
+    "gpt-5": 10e-6,
+}
 
 DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
 
@@ -41,7 +52,7 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model=MODEL):
+    def __init__(self, input, output, model):
         self.input = input
         self.output = output
         self.model = model
@@ -60,7 +71,7 @@ class GptCore:
             self.messages.append({"role": "user", "content": prompt})
 
             response = self.client.chat.completions.create(
-                model=self.model, messages=self.messages, reasoning_effort=EFFORT
+                model=self.model, messages=self.messages
             )
 
             message = response.choices[0].message

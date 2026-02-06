@@ -61,8 +61,8 @@ def main():
     parser.add_argument(
         "-M",
         "--model",
-        default="o3-mini",
-        help="Use different model than o3-mini.",
+        default=core.DEFAULT_MODEL,
+        help=f"Use different model than {core.DEFAULT_MODEL}",
     )
     args = parser.parse_args()
 

@@ -64,12 +64,39 @@ def main():
         default=core.DEFAULT_MODEL,
         help=f"Use different model than {core.DEFAULT_MODEL}",
     )
+    parser.add_argument(
+        "-p",
+        "--prepend",
+        metavar="FILE",
+        help="Plain text file whose contents will be prepended to the first user message.",
+    )
     args = parser.parse_args()
 
     if args.multiline:
         input_f = cli_input_multiline
     else:
         input_f = cli_input
+
+    if args.prepend:
+        with open(args.prepend, "r") as f:
+            prefix = f.read()
+
+        original_input_f = input_f
+
+        def input_f_with_prepend():
+            msg = original_input_f()
+            if msg is not None:
+                msg = prefix + "\n" + msg
+            return msg
+
+        # Replace input_f for the first call only
+        first_call = [True]
+
+        def input_f():
+            if first_call[0]:
+                first_call[0] = False
+                return input_f_with_prepend()
+            return original_input_f()
 
     core.load_key()
     core.GptCore(input_f, cli_output, model=args.model).main()

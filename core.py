@@ -77,31 +77,29 @@ class GptCore:
         while prompt := self.input():
             self.messages.append({"role": "user", "content": prompt})
 
-            response = self.client.chat.completions.create(
-                model=self.model, messages=self.messages
+            response = self.client.responses.create(
+                model=self.model, input=self.messages
             )
 
-            message = response.choices[0].message
-            self.messages.append(message)
+            content = response.output_text.strip()
+            self.messages.append({"role": "assistant", "content": content})
             serialized = [dict(m) for m in self.messages]
             with open(self.file, "w") as f:
                 json.dump(serialized, f, sort_keys=True, indent=4)
 
-            content = message.content.strip()
-
             usage = response.usage
-            prompt_tokens, completion_tokens = (
-                usage.prompt_tokens,
-                usage.completion_tokens,
+            input_tokens, output_tokens = (
+                usage.input_tokens,
+                usage.output_tokens,
             )
 
             if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
-                price += USD_PER_INPUT_TOKEN[self.model] * prompt_tokens
-                price += USD_PER_OUTPUT_TOKEN[self.model] * completion_tokens
+                price += USD_PER_INPUT_TOKEN[self.model] * input_tokens
+                price += USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
             else:
                 price = "N/A"
 
-            self.output(content, Info(prompt_tokens, completion_tokens, price))
+            self.output(content, Info(input_tokens, output_tokens, price))
 
 
 @dataclass
@@ -111,21 +109,21 @@ class Info:
 
     Attributes
     ----------
-    prompt_tokens : int
-        the number of tokens in the prompt
-    completion_tokens : int
-        the number of tokens in the completion
+    input_tokens : int
+        the number of tokens in the input
+    output_tokens : int
+        the number of tokens in the output
     price : float
         the total price of the interaction
     """
 
-    prompt_tokens: int
-    completion_tokens: int
+    input_tokens: int
+    output_tokens: int
     price: float
 
     def __repr__(self):
         return (
-            f"Prompt tokens: {self.prompt_tokens}, "
-            f"Completion tokens: {self.completion_tokens}, "
+            f"Input tokens: {self.input_tokens}, "
+            f"Output tokens: {self.output_tokens}, "
             f"Total price: {self.price:.3f} USD"
         )

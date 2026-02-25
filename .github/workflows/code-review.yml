@@ -15,3 +15,4 @@ jobs:
         with:
           openai-key: ${{ secrets.OPENAI_API_KEY }}
           max-length: 50000
+          model: gpt-5.3-codex

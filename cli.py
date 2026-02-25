@@ -51,7 +51,7 @@ def cli_output(msg, info):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Interact with OpenAI's GPT-4 model.")
+    parser = argparse.ArgumentParser(description="Interact with OpenAI's LLMs.")
     parser.add_argument(
         "-m",
         "--multiline",

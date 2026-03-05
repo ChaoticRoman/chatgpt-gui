@@ -18,6 +18,8 @@ USD_PER_INPUT_TOKEN = {
     "gpt-5.1": 1.25e-6,
     "gpt-5.2": 1.75e-6,
     "gpt-5.3-codex": 1.75e-6,
+    "gpt-5.4": 2.5e-6,
+    "gpt-5.4-pro": 30e-6,
 }
 USD_PER_OUTPUT_TOKEN = {
     "o1": 60e-6,
@@ -28,6 +30,8 @@ USD_PER_OUTPUT_TOKEN = {
     "gpt-5.1": 10e-6,
     "gpt-5.2": 14e-6,
     "gpt-5.3-codex": 14e-6,
+    "gpt-5.4": 15e-6,
+    "gpt-5.4-pro": 180e-6,
 }
 assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
 
@@ -81,7 +85,7 @@ class GptCore:
                 model=self.model, input=self.messages
             )
 
-            content = response.output_text.strip()
+            content = (response.output_text or "").strip()
             self.messages.append({"role": "assistant", "content": content})
             serialized = [dict(m) for m in self.messages]
             with open(self.file, "w") as f:
@@ -97,7 +101,7 @@ class GptCore:
                 price += USD_PER_INPUT_TOKEN[self.model] * input_tokens
                 price += USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
             else:
-                price = "N/A"
+                price = None
 
             self.output(content, Info(input_tokens, output_tokens, price))
 
@@ -113,17 +117,18 @@ class Info:
         the number of tokens in the input
     output_tokens : int
         the number of tokens in the output
-    price : float
+    price : float | None
         the total price of the interaction
     """
 
     input_tokens: int
     output_tokens: int
-    price: float
+    price: float | None
 
     def __repr__(self):
+        price_repr = f"{self.price:.3f} USD" if self.price is not None else "N/A"
         return (
             f"Input tokens: {self.input_tokens}, "
             f"Output tokens: {self.output_tokens}, "
-            f"Total price: {self.price:.3f} USD"
+            f"Total price: {price_repr}"
         )

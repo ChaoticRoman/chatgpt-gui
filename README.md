@@ -49,6 +49,22 @@ lines and input "SEND" when you are done.
 
 Quit with either `q`, `x`, `exit` or `quit` as the input.
 
+#### Batch Mode
+
+Use `-b` or `--batch-mode` for non-interactive usage with pipes and redirection.
+Pricing info is printed to stderr, so only the model's response goes to stdout.
+
+```bash
+./cli.py -b <<< "Tell a joke" > joke.txt
+./cli.py -b < prompt.txt > output.txt
+```
+
+You can combine it with `--prepend` as well:
+
+```bash
+./cli.py -b --prepend summarize_prompt.txt < article.txt
+```
+
 ### GUI History Viewer
 
 This is going to be extended to full GUI client but for now we can at least browse past conversations

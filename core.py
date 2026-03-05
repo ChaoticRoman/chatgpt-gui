@@ -76,6 +76,14 @@ class GptCore:
 
         self.client = openai.OpenAI()
 
+    def _compute_price(self, input_tokens, output_tokens):
+        if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
+            return (
+                USD_PER_INPUT_TOKEN[self.model] * input_tokens
+                + USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
+            )
+        return None
+
     def main(self):
         price = 0
         while prompt := self.input():
@@ -92,18 +100,28 @@ class GptCore:
                 json.dump(serialized, f, sort_keys=True, indent=4)
 
             usage = response.usage
-            input_tokens, output_tokens = (
-                usage.input_tokens,
-                usage.output_tokens,
-            )
-
-            if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
-                price += USD_PER_INPUT_TOKEN[self.model] * input_tokens
-                price += USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
+            input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
+            step_price = self._compute_price(input_tokens, output_tokens)
+            if step_price is not None:
+                price += step_price
             else:
                 price = None
 
             self.output(content, Info(input_tokens, output_tokens, price))
+
+    def one_shot(self):
+        prompt = self.input()
+        if not prompt:
+            return
+        self.messages.append({"role": "user", "content": prompt})
+        response = self.client.responses.create(model=self.model, input=self.messages)
+        content = (response.output_text or "").strip()
+
+        usage = response.usage
+        input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
+        price = self._compute_price(input_tokens, output_tokens)
+
+        self.output(content, Info(input_tokens, output_tokens, price))
 
 
 @dataclass

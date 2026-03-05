@@ -163,12 +163,12 @@ class JsonViewerApp(tk.Tk):
     def get_ai_response(self):
         """Get AI response (runs in separate thread)."""
         try:
-            response = self.gpt_core.client.chat.completions.create(
-                model=self.gpt_core.model, messages=self.gpt_core.messages
+            response = self.gpt_core.client.responses.create(
+                model=self.gpt_core.model, input=self.gpt_core.messages
             )
 
-            message = response.choices[0].message
-            self.gpt_core.messages.append(dict(message))
+            content = response.output_text.strip()
+            self.gpt_core.messages.append({"role": "assistant", "content": content})
 
             # Save to file
             serialized = [dict(m) for m in self.gpt_core.messages]

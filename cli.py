@@ -65,12 +65,38 @@ def main():
         help=f"Use different model than {core.DEFAULT_MODEL}",
     )
     parser.add_argument(
+        "-b",
+        "--batch-mode",
+        action="store_true",
+        help="No prompt, pricing info in stderr, quit after first response. For use with pipes/redirection.",
+    )
+    parser.add_argument(
         "-p",
         "--prepend",
         metavar="FILE",
         help="Plain text file whose contents will be prepended to the first user message.",
     )
     args = parser.parse_args()
+
+    if args.batch_mode:
+        import sys
+
+        prompt = sys.stdin.read().strip()
+
+        if args.prepend:
+            with open(args.prepend, "r") as f:
+                prompt = f.read() + "\n" + prompt
+
+        def batch_input():
+            return prompt
+
+        def batch_output(msg, info):
+            print(msg)
+            print(info, file=sys.stderr)
+
+        core.load_key()
+        core.GptCore(batch_input, batch_output, model=args.model).one_shot()
+        return
 
     if args.multiline:
         input_f = cli_input_multiline

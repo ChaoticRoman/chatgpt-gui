@@ -123,6 +123,9 @@ class GptCore:
 
         self.output(content, Info(input_tokens, output_tokens, price))
 
+    def list_models(self):
+        return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])
+
 
 @dataclass
 class Info:

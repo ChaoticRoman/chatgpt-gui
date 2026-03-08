@@ -76,7 +76,42 @@ def main():
         metavar="FILE",
         help="Plain text file whose contents will be prepended to the first user message.",
     )
+    parser.add_argument(
+        "-l",
+        "--list-known",
+        action="store_true",
+        help="List models with pricing records available.",
+    )
+    parser.add_argument(
+        "-L",
+        "--list-all",
+        action="store_true",
+        help="List all models available.",
+    )
     args = parser.parse_args()
+
+    if (
+        (args.list_known or args.list_all)
+        and (
+            args.multiline
+            or args.model != core.DEFAULT_MODEL
+            or args.batch_mode
+            or args.prepend
+        )
+    ) or (args.list_known and args.list_all):
+        parser.error(
+            "-l/--list-known and -L/--list-all cannot be combined with other options."
+        )
+
+    if args.list_known:
+        [print(m) for m in sorted(core.USD_PER_INPUT_TOKEN.keys())]
+        return
+
+    core.load_key()
+
+    if args.list_all:
+        [print(m) for m in core.GptCore(None, None, None).list_models()]
+        return
 
     if args.batch_mode:
         import sys
@@ -94,8 +129,7 @@ def main():
             print(msg)
             print(info, file=sys.stderr)
 
-        core.load_key()
-        core.GptCore(batch_input, batch_output, model=args.model).one_shot()
+        core.GptCore(batch_input, batch_output, args.model).one_shot()
         return
 
     if args.multiline:
@@ -124,7 +158,6 @@ def main():
                 return input_f_with_prepend()
             return original_input_f()
 
-    core.load_key()
     core.GptCore(input_f, cli_output, model=args.model).main()
 
 

@@ -84,44 +84,40 @@ class GptCore:
             )
         return None
 
+    def send(self, prompt):
+        """Send a message and get response. Returns (content, Info)."""
+        self.messages.append({"role": "user", "content": prompt})
+
+        response = self.client.responses.create(model=self.model, input=self.messages)
+
+        content = (response.output_text or "").strip()
+        self.messages.append({"role": "assistant", "content": content})
+        serialized = [dict(m) for m in self.messages]
+        with open(self.file, "w") as f:
+            json.dump(serialized, f, sort_keys=True, indent=4)
+
+        usage = response.usage
+        input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
+        step_price = self._compute_price(input_tokens, output_tokens)
+
+        return content, Info(input_tokens, output_tokens, step_price)
+
     def main(self):
         price = 0
         while prompt := self.input():
-            self.messages.append({"role": "user", "content": prompt})
-
-            response = self.client.responses.create(
-                model=self.model, input=self.messages
-            )
-
-            content = (response.output_text or "").strip()
-            self.messages.append({"role": "assistant", "content": content})
-            serialized = [dict(m) for m in self.messages]
-            with open(self.file, "w") as f:
-                json.dump(serialized, f, sort_keys=True, indent=4)
-
-            usage = response.usage
-            input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
-            step_price = self._compute_price(input_tokens, output_tokens)
-            if step_price is not None:
-                price += step_price
+            content, info = self.send(prompt)
+            if info.price is not None:
+                price += info.price
             else:
                 price = None
-
-            self.output(content, Info(input_tokens, output_tokens, price))
+            self.output(content, Info(info.input_tokens, info.output_tokens, price))
 
     def one_shot(self):
         prompt = self.input()
         if not prompt:
             return
-        self.messages.append({"role": "user", "content": prompt})
-        response = self.client.responses.create(model=self.model, input=self.messages)
-        content = (response.output_text or "").strip()
-
-        usage = response.usage
-        input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
-        price = self._compute_price(input_tokens, output_tokens)
-
-        self.output(content, Info(input_tokens, output_tokens, price))
+        content, info = self.send(prompt)
+        self.output(content, info)
 
     def list_models(self):
         return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])

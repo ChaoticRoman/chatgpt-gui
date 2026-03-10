@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import sys
 
 # importing readline adds history and navigation to input builtin
 import readline  # noqa F401
@@ -114,8 +115,6 @@ def main():
         return
 
     if args.batch_mode:
-        import sys
-
         prompt = sys.stdin.read().strip()
 
         if args.prepend:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import json
+import threading
 import tkinter as tk
 from tkinter import (
     Listbox,
@@ -122,7 +123,9 @@ class JsonViewerApp(tk.Tk):
         )
 
         # Load existing messages into GptCore
-        self.gpt_core.messages = existing_messages.copy()
+        self.gpt_core.messages = [
+            {"role": m["role"], "content": m["content"]} for m in existing_messages
+        ]
         self.gpt_core.file = file_path
 
     def on_enter(self, event):
@@ -142,38 +145,25 @@ class JsonViewerApp(tk.Tk):
         if not user_message:
             return
 
+        self.display_conversation(
+            self.gpt_core.messages + [{"role": "user", "content": user_message}]
+        )
+
         # Clear input field
         self.input_text.delete("1.0", END)
-
-        # Add user message to conversation
-        self.gpt_core.messages.append({"role": "user", "content": user_message})
-
-        # Update display to show user message
-        self.display_conversation(self.gpt_core.messages)
 
         # Disable input while processing
         self.send_button.config(state="disabled")
         self.input_text.config(state="disabled")
 
-        # Get AI response in separate thread to avoid blocking UI
-        import threading
+        threading.Thread(
+            target=self.get_ai_response, args=(user_message,), daemon=True
+        ).start()
 
-        threading.Thread(target=self.get_ai_response, daemon=True).start()
-
-    def get_ai_response(self):
+    def get_ai_response(self, user_message):
         """Get AI response (runs in separate thread)."""
         try:
-            response = self.gpt_core.client.responses.create(
-                model=self.gpt_core.model, input=self.gpt_core.messages
-            )
-
-            content = response.output_text.strip()
-            self.gpt_core.messages.append({"role": "assistant", "content": content})
-
-            # Save to file
-            serialized = [dict(m) for m in self.gpt_core.messages]
-            with open(self.gpt_core.file, "w") as f:
-                json.dump(serialized, f, sort_keys=True, indent=4)
+            self.gpt_core.send(user_message)
 
             # Update display with new message
             self.after(0, lambda: self.display_conversation(self.gpt_core.messages))

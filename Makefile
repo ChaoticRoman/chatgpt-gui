@@ -4,7 +4,7 @@ test:
 	python -m pytest tests/ -v
 
 lint:
-	ruff check -v .
+	ruff check .
 	ruff format --diff .
 
 format:

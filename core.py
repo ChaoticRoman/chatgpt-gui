@@ -45,6 +45,27 @@ def load_key():
             os.environ["OPENAI_API_KEY"] = f.read().strip()
 
 
+def _extract_sources(response):
+    """Extract web search sources from a response."""
+    sources = []
+    seen_urls = set()
+    for item in response.output:
+        if getattr(item, "type", None) == "web_search_call":
+            action = getattr(item, "action", None)
+            if action:
+                for source in getattr(action, "sources", []):
+                    url = getattr(source, "url", "")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        sources.append(
+                            {
+                                "title": getattr(source, "title", url),
+                                "url": url,
+                            }
+                        )
+    return sources
+
+
 class GptCore:
     """
     A class to interact with OpenAI's GPT-4 model.
@@ -63,10 +84,11 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model):
+    def __init__(self, input, output, model, web_search=False):
         self.input = input
         self.output = output
         self.model = model
+        self.web_search = web_search
 
         self.messages = []
 
@@ -88,9 +110,21 @@ class GptCore:
         """Send a message and get response. Returns (content, Info)."""
         self.messages.append({"role": "user", "content": prompt})
 
-        response = self.client.responses.create(model=self.model, input=self.messages)
+        kwargs = dict(model=self.model, input=self.messages)
+        if self.web_search:
+            kwargs["tools"] = [{"type": "web_search"}]
+            kwargs["include"] = ["web_search_call.action.sources"]
+
+        response = self.client.responses.create(**kwargs)
 
         content = (response.output_text or "").strip()
+
+        if self.web_search:
+            sources = _extract_sources(response)
+            if sources:
+                content += "\n\n**Sources:**\n" + "\n".join(
+                    f"- [{s['title']}]({s['url']})" for s in sources
+                )
         self.messages.append({"role": "assistant", "content": content})
         serialized = [dict(m) for m in self.messages]
         with open(self.file, "w") as f:

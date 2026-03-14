@@ -2,7 +2,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import sys
 from datetime import datetime as dt
+from pprint import pprint
 
 import openai
 
@@ -84,11 +86,12 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model, web_search=False):
+    def __init__(self, input, output, model, web_search=False, debug=False):
         self.input = input
         self.output = output
         self.model = model
         self.web_search = web_search
+        self.debug = debug
 
         self.messages = []
 
@@ -116,6 +119,9 @@ class GptCore:
             kwargs["include"] = ["web_search_call.action.sources"]
 
         response = self.client.responses.create(**kwargs)
+
+        if self.debug:
+            pprint(response.to_dict(), stream=sys.stderr)
 
         content = (response.output_text or "").strip()
 

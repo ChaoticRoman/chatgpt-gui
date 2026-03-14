@@ -84,6 +84,12 @@ def main():
         help="Enable web search tool.",
     )
     parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Pretty print raw OpenAI responses to stderr.",
+    )
+    parser.add_argument(
         "-l",
         "--list-known",
         action="store_true",
@@ -105,6 +111,7 @@ def main():
             or args.batch_mode
             or args.prepend
             or args.web_search
+            or args.debug
         )
     ) or (args.list_known and args.list_all):
         parser.error(
@@ -136,7 +143,11 @@ def main():
             print(info, file=sys.stderr)
 
         core.GptCore(
-            batch_input, batch_output, args.model, web_search=args.web_search
+            batch_input,
+            batch_output,
+            args.model,
+            web_search=args.web_search,
+            debug=args.debug,
         ).one_shot()
         return
 
@@ -167,7 +178,11 @@ def main():
             return original_input_f()
 
     core.GptCore(
-        input_f, cli_output, model=args.model, web_search=args.web_search
+        input_f,
+        cli_output,
+        model=args.model,
+        web_search=args.web_search,
+        debug=args.debug,
     ).main()
 
 

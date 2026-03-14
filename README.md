@@ -9,6 +9,7 @@ to run the commands.
 The clients depend on the following Python packages:
 
 - `openai`: This package is used to interact with the OpenAI API and send requests to the ChatGPT model.
+- `rich`: Used by the CLI client to render Markdown responses in the terminal.
 
 ## Installation
 
@@ -17,7 +18,7 @@ The clients depend on the following Python packages:
 To install the dependencies for CLI client, run the following command:
 
 ```bash
-pip install openai
+pip install openai rich
 ```
 
 For GUI history viewer you would need Tkinter, which is often part of standard Python installation, and

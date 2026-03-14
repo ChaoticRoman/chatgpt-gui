@@ -5,7 +5,12 @@ import sys
 # importing readline adds history and navigation to input builtin
 import readline  # noqa F401
 
+from rich.console import Console
+from rich.markdown import Markdown
+
 import core
+
+console = Console()
 
 
 def check_exit(user_input):
@@ -47,7 +52,10 @@ def cli_input_multiline():
 
 
 def cli_output(msg, info):
-    print(msg)
+    if sys.stdout.isatty():
+        console.print(Markdown(msg))
+    else:
+        print(msg)
     print(info)
 
 

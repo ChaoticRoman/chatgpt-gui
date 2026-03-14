@@ -194,6 +194,43 @@ class TestModelFlag:
         assert rc == 1
 
 
+class TestWebSearch:
+    """Test web search functionality. Limited to one test due to API cost."""
+
+    def test_web_search_batch(self):
+        """Web search should return a response with sources and search count."""
+        stdout, stderr, rc = run_cli(
+            "What is the current population of Iceland? Just the number.",
+            extra_args=["-b", "-w"],
+        )
+        assert rc == 0
+        assert len(stdout.strip()) > 0
+        assert "Web searches:" in stderr
+
+
+class TestDebugMode:
+    """Test debug mode that prints raw responses to stderr."""
+
+    def test_debug_prints_to_stderr(self):
+        """Debug flag should print raw response dict to stderr."""
+        stdout, stderr, rc = run_cli(
+            "Say ok.\nq\n",
+            extra_args=["-d"],
+        )
+        assert rc == 0
+        assert "output_text" in stderr
+
+    def test_debug_batch_mode(self):
+        """Debug flag should work in batch mode too."""
+        stdout, stderr, rc = run_cli(
+            "Say ok.",
+            extra_args=["-b", "-d"],
+        )
+        assert rc == 0
+        assert "output_text" in stderr
+        assert get_responses(stdout)[0]
+
+
 class TestEdgeCases:
     """Edge cases and robustness tests."""
 

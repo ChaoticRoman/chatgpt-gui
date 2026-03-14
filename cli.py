@@ -78,6 +78,18 @@ def main():
         help="Plain text file whose contents will be prepended to the first user message.",
     )
     parser.add_argument(
+        "-w",
+        "--web-search",
+        action="store_true",
+        help="Enable web search tool.",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Pretty print raw OpenAI responses to stderr.",
+    )
+    parser.add_argument(
         "-l",
         "--list-known",
         action="store_true",
@@ -98,6 +110,8 @@ def main():
             or args.model != core.DEFAULT_MODEL
             or args.batch_mode
             or args.prepend
+            or args.web_search
+            or args.debug
         )
     ) or (args.list_known and args.list_all):
         parser.error(
@@ -128,7 +142,13 @@ def main():
             print(msg)
             print(info, file=sys.stderr)
 
-        core.GptCore(batch_input, batch_output, args.model).one_shot()
+        core.GptCore(
+            batch_input,
+            batch_output,
+            args.model,
+            web_search=args.web_search,
+            debug=args.debug,
+        ).one_shot()
         return
 
     if args.multiline:
@@ -157,7 +177,13 @@ def main():
                 return input_f_with_prepend()
             return original_input_f()
 
-    core.GptCore(input_f, cli_output, model=args.model).main()
+    core.GptCore(
+        input_f,
+        cli_output,
+        model=args.model,
+        web_search=args.web_search,
+        debug=args.debug,
+    ).main()
 
 
 if __name__ == "__main__":

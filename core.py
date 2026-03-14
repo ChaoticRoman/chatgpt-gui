@@ -2,7 +2,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import sys
 from datetime import datetime as dt
+from pprint import pprint
 
 import openai
 
@@ -35,6 +37,8 @@ USD_PER_OUTPUT_TOKEN = {
 }
 assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
 
+USD_PER_WEB_SEARCH_CALL = 0.01
+
 DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
 
 
@@ -43,6 +47,27 @@ def load_key():
         api_key_path = os.path.join(os.path.dirname(__file__), ".api_key")
         with open(api_key_path, "r") as f:
             os.environ["OPENAI_API_KEY"] = f.read().strip()
+
+
+def _extract_sources(response):
+    """Extract web search sources from a response."""
+    sources = []
+    seen_urls = set()
+    for item in response.output:
+        if getattr(item, "type", None) == "web_search_call":
+            action = getattr(item, "action", None)
+            if action:
+                for source in getattr(action, "sources", []):
+                    url = getattr(source, "url", "")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        sources.append(
+                            {
+                                "title": getattr(source, "title", url),
+                                "url": url,
+                            }
+                        )
+    return sources
 
 
 class GptCore:
@@ -63,10 +88,12 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model):
+    def __init__(self, input, output, model, web_search=False, debug=False):
         self.input = input
         self.output = output
         self.model = model
+        self.web_search = web_search
+        self.debug = debug
 
         self.messages = []
 
@@ -76,11 +103,12 @@ class GptCore:
 
         self.client = openai.OpenAI()
 
-    def _compute_price(self, input_tokens, output_tokens):
+    def _compute_price(self, input_tokens, output_tokens, web_search_calls=0):
         if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
             return (
                 USD_PER_INPUT_TOKEN[self.model] * input_tokens
                 + USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
+                + USD_PER_WEB_SEARCH_CALL * web_search_calls
             )
         return None
 
@@ -88,29 +116,56 @@ class GptCore:
         """Send a message and get response. Returns (content, Info)."""
         self.messages.append({"role": "user", "content": prompt})
 
-        response = self.client.responses.create(model=self.model, input=self.messages)
+        kwargs = dict(model=self.model, input=self.messages)
+        if self.web_search:
+            kwargs["tools"] = [{"type": "web_search"}]
+            kwargs["include"] = ["web_search_call.action.sources"]
+
+        response = self.client.responses.create(**kwargs)
+
+        if self.debug:
+            pprint(response.to_dict(), stream=sys.stderr)
 
         content = (response.output_text or "").strip()
         self.messages.append({"role": "assistant", "content": content})
+
+        if self.web_search:
+            sources = _extract_sources(response)
+            if sources:
+                content += "\n\n**Sources:**\n" + "\n".join(
+                    f"- [{s['title']}]({s['url']})" for s in sources
+                )
         serialized = [dict(m) for m in self.messages]
         with open(self.file, "w") as f:
             json.dump(serialized, f, sort_keys=True, indent=4)
 
         usage = response.usage
         input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
-        step_price = self._compute_price(input_tokens, output_tokens)
+        web_search_calls = sum(
+            1
+            for item in response.output
+            if getattr(item, "type", None) == "web_search_call"
+        )
+        step_price = self._compute_price(input_tokens, output_tokens, web_search_calls)
 
-        return content, Info(input_tokens, output_tokens, step_price)
+        return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
     def main(self):
         price = 0
+        total_web_search_calls = 0
         while prompt := self.input():
             content, info = self.send(prompt)
             if info.price is not None:
                 price += info.price
             else:
                 price = None
-            self.output(content, Info(info.input_tokens, info.output_tokens, price))
+            total_web_search_calls += info.web_search_calls
+            self.output(
+                content,
+                Info(
+                    info.input_tokens, info.output_tokens, total_web_search_calls, price
+                ),
+            )
 
     def one_shot(self):
         prompt = self.input()
@@ -134,18 +189,24 @@ class Info:
         the number of tokens in the input
     output_tokens : int
         the number of tokens in the output
+    web_search_calls : int
+        the number of web search calls made
     price : float | None
         the total price of the interaction
     """
 
     input_tokens: int
     output_tokens: int
+    web_search_calls: int
     price: float | None
 
     def __repr__(self):
         price_repr = f"{self.price:.3f} USD" if self.price is not None else "N/A"
-        return (
-            f"Input tokens: {self.input_tokens}, "
-            f"Output tokens: {self.output_tokens}, "
-            f"Total price: {price_repr}"
-        )
+        parts = [
+            f"Input tokens: {self.input_tokens}",
+            f"Output tokens: {self.output_tokens}",
+        ]
+        if self.web_search_calls:
+            parts.append(f"Web searches: {self.web_search_calls}")
+        parts.append(f"Total price: {price_repr}")
+        return ", ".join(parts)

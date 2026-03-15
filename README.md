@@ -1,79 +1,78 @@
 # ChatGPT Python Clients
 
-This repository contains Python command-line interface (CLI) and graphical user interface (GUI) clients
-for OpenAI's ChatGPT. The clients are designed to be simple and easy to use, with no arguments required
-to run the commands.
-
-## Dependencies
-
-The clients depend on the following Python packages:
-
-- `openai`: This package is used to interact with the OpenAI API and send requests to the ChatGPT model.
-- `rich`: Used by the CLI client to render Markdown responses in the terminal.
+Python CLI and GUI clients for OpenAI's ChatGPT. Simple, no arguments required to get started.
 
 ## Installation
 
 **Note:** Prefer your distribution packages if possible.
 
-To install the dependencies for CLI client, run the following command:
+For the CLI client:
 
 ```bash
 pip install openai rich
 ```
 
-For GUI history viewer you would need Tkinter, which is often part of standard Python installation, and
-some additional libraries:
+For the GUI client (Tkinter is often part of the standard Python installation):
 
 ```bash
-pip install tkinterweb mistletoe pygments
+pip install openai tkinterweb mistletoe pygments
 ```
 
 ## Usage
 
-### API key
+### API Key
 
-Expects `.api_key` file in the repo directory with your OpenAI API key in there. Don't worry to contribute,
-the filename is in `.gitignore` already.
+Expects `.api_key` file in the repo directory with your OpenAI API key. The filename is
+in `.gitignore` already.
+
+Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`.
 
 ### CLI Client
-
-To use the CLI client, run the following command:
 
 ```bash
 ./cli.py
 ```
 
-The CLI client will prompt you to enter your input. The response from ChatGPT will be printed in the console.
+Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 
-You can also enable multiline mode with the `-m` or `--multiline` option. In this mode, you can input multiple
-lines and input "SEND" when you are done.
+#### Options
 
-Quit with either `q`, `x`, `exit` or `quit` as the input, or press `Ctrl+C` or `Ctrl+D`.
+| Flag | Description |
+|------|-------------|
+| `-m`, `--multiline` | Multiline input mode — type your message, then enter `SEND` to submit |
+| `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection (pricing info goes to stderr) |
+| `-M`, `--model` | Select a specific model |
+| `-w`, `--web-search` | Enable web search with source extraction |
+| `-p`, `--prepend` | Prepend a file's contents to the first message |
+| `-d`, `--debug` | Pretty-print raw API responses to stderr |
+| `-l`, `--list-known` | List models with known pricing |
+| `-L`, `--list-all` | List all available models |
 
-#### Batch Mode
-
-Use `-b` or `--batch-mode` for non-interactive usage with pipes and redirection.
-Pricing info is printed to stderr, so only the model's response goes to stdout.
+#### Batch Mode Examples
 
 ```bash
 ./cli.py -b <<< "Tell a joke" > joke.txt
 ./cli.py -b < prompt.txt > output.txt
-```
-
-You can combine it with `--prepend` as well:
-
-```bash
 ./cli.py -b --prepend summarize_prompt.txt < article.txt
 ```
 
-### GUI History Viewer
-
-This is going to be extended to full GUI client but for now we can at least browse past conversations
-with nice rendering and syntax highlighting. Run it using
+### GUI Client
 
 ```bash
 ./gui.py
 ```
+
+Browse past conversations and chat interactively with full Markdown rendering and syntax
+highlighting.
+
+- **Resizable panes** — drag the separators between panels to adjust layout
+- **Sortable conversation list** — click the column header to toggle sort order
+- **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for a new line
+
+### Other Tools
+
+- **`whisper.py`** — transcribe audio using OpenAI's Whisper API
+- **`dale.py`** — generate images using DALL-E 3
 
 ## Contributing
 

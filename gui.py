@@ -28,28 +28,34 @@ class JsonViewerApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("JSON Viewer")
-        self.geometry("800x600")
+        self.title("ChatGPT GUI")
+        self.geometry("1000x700")
+        self.minsize(600, 400)
 
-        self.left_frame = tk.Frame(self)
-        self.left_frame.pack(side=LEFT, fill=tk.Y)
+        # Horizontal paned window: file list | conversation
+        self.hpaned = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashwidth=5)
+        self.hpaned.pack(fill=BOTH, expand=True)
 
-        self.right_frame = tk.Frame(self)
-        self.right_frame.pack(side=LEFT, fill=BOTH, expand=True)
-
-        self.file_listbox = Listbox(self.left_frame, width=40)
-        self.file_listbox.pack(side=LEFT, fill=tk.Y)
+        # Left: file list with scrollbar
+        self.left_frame = tk.Frame(self.hpaned)
+        self.file_listbox = Listbox(self.left_frame, width=30)
+        self.file_listbox.pack(side=LEFT, fill=BOTH, expand=True)
         self.scrollbar = Scrollbar(self.left_frame)
         self.scrollbar.pack(side=RIGHT, fill=Y)
         self.file_listbox.config(yscrollcommand=self.scrollbar.set)
         self.scrollbar.config(command=self.file_listbox.yview)
+        self.hpaned.add(self.left_frame, minsize=150)
 
-        self.file_content_text = HtmlFrame(self.right_frame, messages_enabled=False)
-        self.file_content_text.pack(fill=BOTH, expand=True)
+        # Right: vertical paned window for content | input
+        self.vpaned = tk.PanedWindow(self.hpaned, orient=tk.VERTICAL, sashwidth=5)
+        self.hpaned.add(self.vpaned, minsize=300)
 
-        # Input frame at the bottom
-        self.input_frame = tk.Frame(self.right_frame)
-        self.input_frame.pack(side=BOTTOM, fill=X)
+        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)
+        self.vpaned.add(self.file_content_text, minsize=100)
+
+        # Input frame at the bottom (inside vertical paned window)
+        self.input_frame = tk.Frame(self.vpaned)
+        self.vpaned.add(self.input_frame, minsize=60)
 
         self.input_text = Text(self.input_frame, height=3)
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)

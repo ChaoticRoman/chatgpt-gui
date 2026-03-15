@@ -4,18 +4,16 @@ import json
 import threading
 import tkinter as tk
 from tkinter import (
-    Listbox,
     Scrollbar,
     END,
     RIGHT,
     Y,
     LEFT,
     BOTH,
-    BOTTOM,
-    X,
     Text,
     Button,
 )
+from tkinter import ttk
 
 from tkinterweb import HtmlFrame
 from mistletoe import markdown
@@ -28,28 +26,38 @@ class JsonViewerApp(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("JSON Viewer")
-        self.geometry("800x600")
+        self.title("ChatGPT GUI")
+        self.geometry("1000x700")
+        self.minsize(600, 400)
 
-        self.left_frame = tk.Frame(self)
-        self.left_frame.pack(side=LEFT, fill=tk.Y)
+        # Horizontal paned window: file list | conversation
+        self.hpaned = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashwidth=5)
+        self.hpaned.pack(fill=BOTH, expand=True)
 
-        self.right_frame = tk.Frame(self)
-        self.right_frame.pack(side=LEFT, fill=BOTH, expand=True)
-
-        self.file_listbox = Listbox(self.left_frame, width=40)
-        self.file_listbox.pack(side=LEFT, fill=tk.Y)
-        self.scrollbar = Scrollbar(self.left_frame)
+        # Left: file table with scrollbar
+        self.left_frame = tk.Frame(self.hpaned)
+        self.file_table = ttk.Treeview(
+            self.left_frame, columns=("file",), show="headings", selectmode="browse"
+        )
+        self.file_table.heading("file", text="Conversation", command=self.toggle_sort)
+        self.file_table.column("file", anchor="w")
+        self.file_table.pack(side=LEFT, fill=BOTH, expand=True)
+        self.scrollbar = Scrollbar(self.left_frame, command=self.file_table.yview)
         self.scrollbar.pack(side=RIGHT, fill=Y)
-        self.file_listbox.config(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.config(command=self.file_listbox.yview)
+        self.file_table.config(yscrollcommand=self.scrollbar.set)
+        self.hpaned.add(self.left_frame, minsize=150)
+        self.sort_descending = True
 
-        self.file_content_text = HtmlFrame(self.right_frame, messages_enabled=False)
-        self.file_content_text.pack(fill=BOTH, expand=True)
+        # Right: vertical paned window for content | input
+        self.vpaned = tk.PanedWindow(self.hpaned, orient=tk.VERTICAL, sashwidth=5)
+        self.hpaned.add(self.vpaned, minsize=300)
 
-        # Input frame at the bottom
-        self.input_frame = tk.Frame(self.right_frame)
-        self.input_frame.pack(side=BOTTOM, fill=X)
+        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)
+        self.vpaned.add(self.file_content_text, minsize=100)
+
+        # Input frame at the bottom (inside vertical paned window)
+        self.input_frame = tk.Frame(self.vpaned)
+        self.vpaned.add(self.input_frame, minsize=60)
 
         self.input_text = Text(self.input_frame, height=3)
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
@@ -69,29 +77,41 @@ class JsonViewerApp(tk.Tk):
         # Load the list of JSON files
         self.load_json_files()
 
-        # Bind the listbox selection event to a function
-        self.file_listbox.bind("<<ListboxSelect>>", self.on_file_select)
+        # Bind the table selection event to a function
+        self.file_table.bind("<<TreeviewSelect>>", self.on_file_select)
+
+        # Auto-select the first conversation
+        children = self.file_table.get_children()
+        if children:
+            self.file_table.selection_set(children[0])
 
         # Killing with CTRL+C in the console
         self.check()
 
     def load_json_files(self):
         """Load the list of JSON files from the hardcoded folder."""
+        for item in self.file_table.get_children():
+            self.file_table.delete(item)
         if os.path.exists(DATA_DIRECTORY):
             json_files = sorted(
-                [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")]
+                [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")],
+                reverse=self.sort_descending,
             )
             for file in json_files:
-                self.file_listbox.insert(END, file)
+                self.file_table.insert("", END, values=(file,))
         else:
-            self.file_listbox.insert(END, "Folder not found")
+            self.file_table.insert("", END, values=("Folder not found",))
+
+    def toggle_sort(self):
+        """Toggle sort order and reload file list."""
+        self.sort_descending = not self.sort_descending
+        self.load_json_files()
 
     def on_file_select(self, event):
         """Display the content of the selected JSON file."""
-        # Get the selected file name
-        selected_index = self.file_listbox.curselection()
-        if selected_index:
-            selected_file = self.file_listbox.get(selected_index)
+        selection = self.file_table.selection()
+        if selection:
+            selected_file = self.file_table.item(selection[0])["values"][0]
 
             # Construct the full file path
             file_path = os.path.join(DATA_DIRECTORY, selected_file)

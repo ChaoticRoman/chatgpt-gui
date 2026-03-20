@@ -67,8 +67,8 @@ class TestMultiturn:
     def test_context_carries_over(self):
         """Ask the model to remember a secret word, then ask for it back."""
         stdin_text = (
-            "The secret word is 'banana'. Just reply OK.\n"
-            "What is the secret word? Reply with just the word.\n"
+            "Our word is 'banana'. Acknowledged?\n"
+            "What is our word? Reply with just the word.\n"
             "q\n"
         )
         stdout, stderr, rc = run_cli(stdin_text)

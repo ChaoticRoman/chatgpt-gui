@@ -56,6 +56,19 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b --prepend summarize_prompt.txt < article.txt
 ```
 
+More useful example to review patch of PR for currently checked out branch in the current
+directory (expects `gh` client installed):
+
+```bash
+alias review='gh pr diff --patch | gpt -b -p $HOME/.pr-review'
+```
+
+The `.pr-review` file contains:
+
+```
+Summarize and review the following patch:
+```
+
 ### GUI Client
 
 ```bash

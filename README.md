@@ -44,9 +44,11 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
 | `-p`, `--prepend` | Prepend a file's contents to the first message |
+| `-i`, `--image` | Image file to include with the first message |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
+| `-lf`, `--list-files` | List uploaded files |
 
 #### Batch Mode Examples
 
@@ -86,6 +88,28 @@ highlighting.
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
 - **`dale.py`** — generate images using DALL-E 3
+
+## Development
+
+Format, lint, and test with:
+
+```bash
+make format
+make lint
+make test
+```
+
+Run a single test suite:
+
+```bash
+python -m pytest tests/e2e_test.py::TestBatchMode -v
+```
+
+Run a single test case:
+
+```bash
+python -m pytest tests/e2e_test.py::TestBatchMode::test_batch_basic -v
+```
 
 ## Contributing
 

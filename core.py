@@ -112,9 +112,27 @@ class GptCore:
             )
         return None
 
-    def send(self, prompt):
+    def _upload_image(self, image_path):
+        """Upload an image file and return the file ID."""
+        with open(image_path, "rb") as f:
+            file = self.client.files.create(file=f, purpose="vision")
+        return file.id
+
+    def _delete_file(self, file_id):
+        """Delete a previously uploaded file."""
+        self.client.files.delete(file_id)
+
+    def send(self, prompt, image_path=None):
         """Send a message and get response. Returns (content, Info)."""
-        self.messages.append({"role": "user", "content": prompt})
+        if image_path:
+            self._image_file_id = self._upload_image(image_path)
+            content = [
+                {"type": "input_image", "file_id": self._image_file_id},
+                {"type": "input_text", "text": prompt},
+            ]
+        else:
+            content = prompt
+        self.messages.append({"role": "user", "content": content})
 
         kwargs = dict(model=self.model, input=self.messages)
         if self.web_search:
@@ -150,29 +168,47 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
-    def main(self):
+    def main(self, image_path=None):
+        self._image_file_id = None
         price = 0
         total_web_search_calls = 0
-        while prompt := self.input():
-            content, info = self.send(prompt)
-            if info.price is not None:
-                price += info.price
-            else:
-                price = None
-            total_web_search_calls += info.web_search_calls
-            self.output(
-                content,
-                Info(
-                    info.input_tokens, info.output_tokens, total_web_search_calls, price
-                ),
-            )
+        try:
+            while prompt := self.input():
+                content, info = self.send(prompt, image_path=image_path)
+                image_path = None  # only attach image to the first message
+                if info.price is not None:
+                    price += info.price
+                else:
+                    price = None
+                total_web_search_calls += info.web_search_calls
+                self.output(
+                    content,
+                    Info(
+                        info.input_tokens,
+                        info.output_tokens,
+                        total_web_search_calls,
+                        price,
+                    ),
+                )
+        finally:
+            if self._image_file_id:
+                self._delete_file(self._image_file_id)
 
-    def one_shot(self):
+    def one_shot(self, image_path=None):
+        self._image_file_id = None
         prompt = self.input()
         if not prompt:
             return
-        content, info = self.send(prompt)
-        self.output(content, info)
+        try:
+            content, info = self.send(prompt, image_path=image_path)
+            self.output(content, info)
+        finally:
+            if self._image_file_id:
+                self._delete_file(self._image_file_id)
+
+    def list_files(self):
+        """Return list of (id, filename, bytes) tuples for uploaded files."""
+        return [(f.id, f.filename, f.bytes) for f in self.client.files.list().data]
 
     def list_models(self):
         return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])

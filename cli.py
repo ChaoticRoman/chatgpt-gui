@@ -86,6 +86,12 @@ def main():
         help="Plain text file whose contents will be prepended to the first user message.",
     )
     parser.add_argument(
+        "-i",
+        "--image",
+        metavar="FILE",
+        help="Image file to include with the first message.",
+    )
+    parser.add_argument(
         "-w",
         "--web-search",
         action="store_true",
@@ -109,21 +115,30 @@ def main():
         action="store_true",
         help="List all models available.",
     )
+    parser.add_argument(
+        "-lf",
+        "--list-files",
+        action="store_true",
+        help="List uploaded files.",
+    )
     args = parser.parse_args()
 
+    list_opts = [args.list_known, args.list_all, args.list_files]
     if (
-        (args.list_known or args.list_all)
+        any(list_opts)
         and (
             args.multiline
             or args.model != core.DEFAULT_MODEL
             or args.batch_mode
             or args.prepend
+            or args.image
             or args.web_search
             or args.debug
         )
-    ) or (args.list_known and args.list_all):
+    ) or sum(list_opts) > 1:
         parser.error(
-            "-l/--list-known and -L/--list-all cannot be combined with other options."
+            "-l/--list-known, -L/--list-all, and -lf/--list-files "
+            "cannot be combined with each other or other options."
         )
 
     if args.list_known:
@@ -134,6 +149,17 @@ def main():
 
     if args.list_all:
         [print(m) for m in core.GptCore(None, None, None).list_models()]
+        return
+
+    if args.list_files:
+        files = core.GptCore(None, None, None).list_files()
+        if not files:
+            print("No files.")
+            return
+        id_w = max(len(f[0]) for f in files)
+        name_w = max(len(f[1]) for f in files)
+        for fid, name, size in files:
+            print(f"{fid:<{id_w}}  {name:<{name_w}}  {size:>10}")
         return
 
     if args.batch_mode:
@@ -156,7 +182,7 @@ def main():
             args.model,
             web_search=args.web_search,
             debug=args.debug,
-        ).one_shot()
+        ).one_shot(image_path=args.image)
         return
 
     if args.multiline:
@@ -191,7 +217,7 @@ def main():
         model=args.model,
         web_search=args.web_search,
         debug=args.debug,
-    ).main()
+    ).main(image_path=args.image)
 
 
 if __name__ == "__main__":

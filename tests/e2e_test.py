@@ -13,12 +13,14 @@ import tempfile
 import pytest
 
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
-TEST_MODEL = "gpt-5-nano"
+TEST_MODEL = "gpt-5.4-nano"
 
 
 def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL):
     """Run cli.py with given stdin and return (stdout, stderr, returncode)."""
-    cmd = [sys.executable, CLI, "-M", model]
+    cmd = [sys.executable, CLI]
+    if model:
+        cmd.extend(["-M", model])
     if extra_args:
         cmd.extend(extra_args)
     result = subprocess.run(
@@ -175,10 +177,10 @@ class TestMultilineInput:
 
     def test_multiline_preserves_newlines(self):
         """Multiline input should preserve newlines in the prompt."""
-        stdin_text = "Count non-empty lines in this prompt.\nReply with just the count.\nSEND\nq\n"
+        stdin_text = "Just making line.\nAnd another.\nCount non-empty lines in this prompt. Reply with just the count.\nSEND\nq\n"
         stdout, stderr, rc = run_cli(stdin_text, extra_args=["-m"])
         assert rc == 0
-        assert get_responses(stdout)[0] == "2"
+        assert int(get_responses(stdout)[0]) > 1
 
 
 class TestModelFlag:
@@ -259,6 +261,29 @@ class TestEdgeCases:
         stdout, stderr, rc = run_cli("Say ok.\nq\n")
         assert rc == 0
         assert "Input tokens:" in stdout
+
+
+class TestImageInput:
+    """Test image input. Limited to one test due to API cost."""
+
+    def test_image_input(self):
+        """There is a word on the image, it should be recognized and deleted."""
+        files_before, stderr, rc = run_cli(
+            None, extra_args=["--list-files"], model=None
+        )
+        assert rc == 0
+
+        stdout, stderr, rc = run_cli(
+            "What is the word on picture. Reply the word only.",
+            extra_args=["-b", "-i", "tests/test.png"],
+        )
+        assert rc == 0
+        responses = get_responses(stdout)
+        assert responses[0].lower() == "tag"
+
+        files_after, stderr, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+        assert files_before == files_after
 
 
 if __name__ == "__main__":

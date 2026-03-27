@@ -11,7 +11,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: ChaoticRoman/gpt-code-review-action@v11
+      - uses: ChaoticRoman/gpt-code-review-action@v12
         with:
           openai-key: ${{ secrets.OPENAI_API_KEY }}
           max-length: 50000

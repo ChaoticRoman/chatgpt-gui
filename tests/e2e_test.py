@@ -286,5 +286,43 @@ class TestImageInput:
         assert files_before == files_after
 
 
+class TestFileInput:
+    """Test PDF document input."""
+
+    def test_single_pdf(self):
+        """A single PDF should be read and deleted after use."""
+        files_before, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+
+        stdout, stderr, rc = run_cli(
+            "What fruit is mentioned? Reply with just the fruit.",
+            extra_args=["-b", "-f", "tests/test_apple.pdf"],
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0].lower() == "apple"
+
+        files_after, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+        assert files_before == files_after
+
+    def test_multiple_pdfs(self):
+        """Multiple PDFs should all be read and deleted after use."""
+        files_before, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+
+        stdout, stderr, rc = run_cli(
+            "What fruit and what color are mentioned? Reply: fruit, color.",
+            extra_args=["-b", "-f", "tests/test_apple.pdf", "tests/test_banana.pdf"],
+        )
+        assert rc == 0
+        response = get_responses(stdout)[0].lower()
+        assert "apple" in response
+        assert "yellow" in response
+
+        files_after, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+        assert files_before == files_after
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

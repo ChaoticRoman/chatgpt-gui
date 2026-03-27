@@ -45,6 +45,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-w`, `--web-search` | Enable web search with source extraction |
 | `-p`, `--prepend` | Prepend a file's contents to the first message |
 | `-i`, `--image` | Image file to include with the first message |
+| `-f`, `--file` | Document(s) to include with the first message |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
@@ -56,6 +57,14 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b <<< "Tell a joke" > joke.txt
 ./cli.py -b < prompt.txt > output.txt
 ./cli.py -b --prepend summarize_prompt.txt < article.txt
+./cli.py -b -f report.pdf <<< "Summarize this document"
+./cli.py -b -f cv.pdf job.pdf <<< "Is this candidate a good fit?"
+```
+
+The tool is quite powerful with `guake` drop-down terminal and alias like this:
+
+```bash
+alias gpt='$HOME/projects/chatgpt-gui/cli.py'
 ```
 
 More useful example to review patch of PR for currently checked out branch in the current

@@ -92,6 +92,13 @@ def main():
         help="Image file to include with the first message.",
     )
     parser.add_argument(
+        "-f",
+        "--file",
+        nargs="+",
+        metavar="FILE",
+        help="Document(s) to include with the first message.",
+    )
+    parser.add_argument(
         "-w",
         "--web-search",
         action="store_true",
@@ -132,6 +139,7 @@ def main():
             or args.batch_mode
             or args.prepend
             or args.image
+            or args.file
             or args.web_search
             or args.debug
         )
@@ -182,7 +190,7 @@ def main():
             args.model,
             web_search=args.web_search,
             debug=args.debug,
-        ).one_shot(image_path=args.image)
+        ).one_shot(image_path=args.image, file_paths=args.file)
         return
 
     if args.multiline:
@@ -217,7 +225,7 @@ def main():
         model=args.model,
         web_search=args.web_search,
         debug=args.debug,
-    ).main(image_path=args.image)
+    ).main(image_path=args.image, file_paths=args.file)
 
 
 if __name__ == "__main__":

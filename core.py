@@ -112,26 +112,28 @@ class GptCore:
             )
         return None
 
-    def _upload_image(self, image_path):
-        """Upload an image file and return the file ID."""
-        with open(image_path, "rb") as f:
-            file = self.client.files.create(file=f, purpose="vision")
+    def _upload_file(self, path, purpose):
+        """Upload a file and return the file ID."""
+        assert purpose in ("vision", "user_data")
+        with open(path, "rb") as f:
+            file = self.client.files.create(file=f, purpose=purpose)
         return file.id
 
     def _delete_file(self, file_id):
         """Delete a previously uploaded file."""
         self.client.files.delete(file_id)
 
-    def send(self, prompt, image_path=None):
+    def send(self, prompt, image_path=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
+        content = []
         if image_path:
-            self._image_file_id = self._upload_image(image_path)
-            content = [
-                {"type": "input_image", "file_id": self._image_file_id},
-                {"type": "input_text", "text": prompt},
-            ]
-        else:
-            content = prompt
+            self._image_file_id = self._upload_file(image_path, "vision")
+            content.append({"type": "input_image", "file_id": self._image_file_id})
+        for path in file_paths or []:
+            file_id = self._upload_file(path, "user_data")
+            self._file_ids.append(file_id)
+            content.append({"type": "input_file", "file_id": file_id})
+        content.append({"type": "input_text", "text": prompt})
         self.messages.append({"role": "user", "content": content})
 
         kwargs = dict(model=self.model, input=self.messages)
@@ -168,14 +170,18 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
-    def main(self, image_path=None):
+    def main(self, image_path=None, file_paths=None):
         self._image_file_id = None
+        self._file_ids = []
         price = 0
         total_web_search_calls = 0
         try:
             while prompt := self.input():
-                content, info = self.send(prompt, image_path=image_path)
-                image_path = None  # only attach image to the first message
+                content, info = self.send(
+                    prompt, image_path=image_path, file_paths=file_paths
+                )
+                image_path = None  # only attach files to the first message
+                file_paths = None
                 if info.price is not None:
                     price += info.price
                 else:
@@ -193,18 +199,25 @@ class GptCore:
         finally:
             if self._image_file_id:
                 self._delete_file(self._image_file_id)
+            for file_id in self._file_ids:
+                self._delete_file(file_id)
 
-    def one_shot(self, image_path=None):
+    def one_shot(self, image_path=None, file_paths=None):
         self._image_file_id = None
+        self._file_ids = []
         prompt = self.input()
         if not prompt:
             return
         try:
-            content, info = self.send(prompt, image_path=image_path)
+            content, info = self.send(
+                prompt, image_path=image_path, file_paths=file_paths
+            )
             self.output(content, info)
         finally:
             if self._image_file_id:
                 self._delete_file(self._image_file_id)
+            for file_id in self._file_ids:
+                self._delete_file(file_id)
 
     def list_files(self):
         """Return list of (id, filename, bytes) tuples for uploaded files."""

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from functools import partial
 import sys
 
 # importing readline adds history and navigation to input builtin
@@ -51,8 +52,8 @@ def cli_input_multiline():
     return user_input
 
 
-def cli_output(msg, info):
-    if sys.stdout.isatty():
+def cli_output(msg, info, rich=False):
+    if rich and sys.stdout.isatty():
         console.print(Markdown(msg))
     else:
         print(msg)
@@ -99,6 +100,12 @@ def main():
         help="Document(s) to include with the first message.",
     )
     parser.add_argument(
+        "-r",
+        "--rich",
+        action="store_true",
+        help="Render Markdown with rich text formatting in the terminal.",
+    )
+    parser.add_argument(
         "-w",
         "--web-search",
         action="store_true",
@@ -140,6 +147,7 @@ def main():
             or args.prepend
             or args.image
             or args.file
+            or args.rich
             or args.web_search
             or args.debug
         )
@@ -219,9 +227,11 @@ def main():
                 return input_f_with_prepend()
             return original_input_f()
 
+    output_f = partial(cli_output, rich=args.rich)
+
     core.GptCore(
         input_f,
-        cli_output,
+        output_f,
         model=args.model,
         web_search=args.web_search,
         debug=args.debug,

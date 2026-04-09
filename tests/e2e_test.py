@@ -150,7 +150,7 @@ class TestPrepend:
             try:
                 stdin_text = (
                     "What color did the context mention? Reply with just the color.\n"
-                    "How many times did I mention Peter before? Reply with just number.\n"
+                    "How many times did the context mention Peter before? Reply with just number.\n"
                     "q\n"
                 )
                 stdout, stderr, rc = run_cli(
@@ -177,7 +177,7 @@ class TestMultilineInput:
 
     def test_multiline_preserves_newlines(self):
         """Multiline input should preserve newlines in the prompt."""
-        stdin_text = "Just making line.\nAnd another.\nCount non-empty lines in this prompt. Reply with just the count.\nSEND\nq\n"
+        stdin_text = "Just making line.\n\nAnd another.\n\nCount non-empty lines in this prompt. Reply with just the count.\nSEND\nq\n"
         stdout, stderr, rc = run_cli(stdin_text, extra_args=["-m"])
         assert rc == 0
         assert int(get_responses(stdout)[0]) > 1

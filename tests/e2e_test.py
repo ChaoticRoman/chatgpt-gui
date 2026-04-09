@@ -13,7 +13,7 @@ import tempfile
 import pytest
 
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
-TEST_MODEL = "gpt-5.4-nano"
+TEST_MODEL = "gpt-5.4-mini"
 
 
 def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL):

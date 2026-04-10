@@ -12,6 +12,8 @@ import tempfile
 
 import pytest
 
+from core import USD_PER_INPUT_TOKEN
+
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
 
@@ -322,6 +324,21 @@ class TestFileInput:
         files_after, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
         assert rc == 0
         assert files_before == files_after
+
+
+class TestAllModelsSmokeTest:
+    """Smoke test: verify every in-code-priced model can handle a minimal prompt."""
+
+    @pytest.mark.parametrize("model", sorted(USD_PER_INPUT_TOKEN.keys()))
+    def test_model_responds(self, model):
+        stdout, stderr, rc = run_cli(
+            "Second letter of alphabet? Reply with letter only.",
+            extra_args=["-b"],
+            model=model,
+            timeout=120,
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0].lower() == "b"
 
 
 if __name__ == "__main__":

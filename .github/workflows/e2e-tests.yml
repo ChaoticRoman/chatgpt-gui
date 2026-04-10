@@ -5,7 +5,25 @@ on:
     branches: [ main ]
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.should_run }}
+    steps:
+      - name: Check for relevant changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            should_run:
+              - 'cli.py'
+              - 'core.py'
+              - 'tests/**'
+              - '.github/workflows/e2e-tests.yml'
+
   e2e:
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

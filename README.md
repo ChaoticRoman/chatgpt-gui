@@ -25,7 +25,12 @@ pip install openai tkinterweb mistletoe pygments
 Expects `.api_key` file in the repo directory with your OpenAI API key. The filename is
 in `.gitignore` already.
 
-Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`.
+Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`. Override the
+location with the `CHATGPT_GUI_DATA_DIR` environment variable:
+
+```bash
+export CHATGPT_GUI_DATA_DIR=/path/to/your/data
+```
 
 ### CLI Client
 
@@ -97,15 +102,32 @@ highlighting.
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
 - **`dale.py`** — generate images using DALL-E 3
+- **`delete-file.py`** — delete one or more uploaded files by ID
+
+```bash
+./delete-file.py FILE_ID [FILE_ID ...]
+```
 
 ## Development
+
+To run tests, install `pytest`:
+
+```
+pip3 install pytest
+```
+
+To run tests in parallel, install also `pytest-xdist` extension:
+
+```
+pip3 install pytest-xdist
+```
 
 Format, lint, and test with:
 
 ```bash
 make format
 make lint
-make test
+make xtest  # Remove x for sequential test
 ```
 
 Run a single test suite:

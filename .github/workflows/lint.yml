@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Run ruff
-        uses: chartboost/ruff-action@v1.0.0
+        uses: astral-sh/ruff-action@v3
         with:
           args: check -v .
   ruff-format:
@@ -20,6 +20,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Run ruff
-        uses: chartboost/ruff-action@v1.0.0
+        uses: astral-sh/ruff-action@v3
         with:
           args: format --diff .

@@ -18,19 +18,21 @@ CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
 
 
-def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL):
+def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL, extra_env=None):
     """Run cli.py with given stdin and return (stdout, stderr, returncode)."""
     cmd = [sys.executable, CLI]
     if model:
         cmd.extend(["-M", model])
     if extra_args:
         cmd.extend(extra_args)
+    env = {**os.environ, **(extra_env or {})}
     result = subprocess.run(
         cmd,
         input=stdin_text,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=env,
     )
     return result.stdout, result.stderr, result.returncode
 
@@ -42,6 +44,25 @@ def get_responses(stdout):
         if (stripped := line.replace("> ", ""))
         and not line.startswith("Input tokens: ")
     ]
+
+
+def parse_file_ids(list_files_stdout):
+    """Return the set of file IDs from --list-files output."""
+    ids = set()
+    for line in list_files_stdout.splitlines():
+        stripped = line.strip()
+        if stripped and stripped != "No files.":
+            ids.add(stripped.split()[0])
+    return ids
+
+
+def parse_uploaded_ids(stderr):
+    """Return file IDs emitted by core when CHATGPT_CLI_LOG_UPLOADS is set."""
+    ids = set()
+    for line in stderr.splitlines():
+        if line.startswith("uploaded:"):
+            ids.add(line.split(":", 1)[1])
+    return ids
 
 
 class TestSingleTurn:
@@ -270,22 +291,21 @@ class TestImageInput:
 
     def test_image_input(self):
         """There is a word on the image, it should be recognized and deleted."""
-        files_before, stderr, rc = run_cli(
-            None, extra_args=["--list-files"], model=None
-        )
-        assert rc == 0
-
         stdout, stderr, rc = run_cli(
             "What is the word on picture. Reply the word only.",
             extra_args=["-b", "-i", "tests/test.png"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
         )
         assert rc == 0
-        responses = get_responses(stdout)
-        assert responses[0].lower() == "tag"
+        assert get_responses(stdout)[0].lower() == "tag"
 
-        files_after, stderr, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        uploaded = parse_uploaded_ids(stderr)
+        assert uploaded, "Expected a file to be uploaded"
+        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
         assert rc == 0
-        assert files_before == files_after
+        assert not (uploaded & parse_file_ids(current_ids)), (
+            f"Files not cleaned up: {uploaded}"
+        )
 
 
 class TestFileInput:
@@ -293,37 +313,60 @@ class TestFileInput:
 
     def test_single_pdf(self):
         """A single PDF should be read and deleted after use."""
-        files_before, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
-        assert rc == 0
-
         stdout, stderr, rc = run_cli(
             "What fruit is mentioned? Reply with just the fruit.",
             extra_args=["-b", "-f", "tests/test_apple.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
         )
         assert rc == 0
         assert get_responses(stdout)[0].lower() == "apple"
 
-        files_after, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        uploaded = parse_uploaded_ids(stderr)
+        assert uploaded, "Expected a file to be uploaded"
+        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
         assert rc == 0
-        assert files_before == files_after
+        assert not (uploaded & parse_file_ids(current_ids)), (
+            f"Files not cleaned up: {uploaded}"
+        )
 
     def test_multiple_pdfs(self):
         """Multiple PDFs should all be read and deleted after use."""
-        files_before, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
-        assert rc == 0
-
         stdout, stderr, rc = run_cli(
             "What fruit and what color are mentioned? Reply: fruit, color.",
             extra_args=["-b", "-f", "tests/test_apple.pdf", "tests/test_banana.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
         )
         assert rc == 0
         response = get_responses(stdout)[0].lower()
         assert "apple" in response
         assert "yellow" in response
 
-        files_after, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        uploaded = parse_uploaded_ids(stderr)
+        assert len(uploaded) == 2, f"Expected 2 uploaded files, got: {uploaded}"
+        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
         assert rc == 0
-        assert files_before == files_after
+        assert not (uploaded & parse_file_ids(current_ids)), (
+            f"Files not cleaned up: {uploaded}"
+        )
+
+
+class TestConcurrency:
+    """Tests verifying safe parallel execution."""
+
+    def test_concurrent_sessions_have_unique_export_files(self, tmp_path):
+        """Two GptCore instances created at the same second must not share a JSON export path."""
+        from unittest.mock import patch
+        from datetime import datetime
+        import core as core_module
+
+        # Freeze time so both instances see the exact same timestamp — exposes the collision.
+        fixed = datetime(2026, 4, 10, 12, 0, 0)
+        with patch("core.dt") as mock_dt, patch("openai.OpenAI"):
+            mock_dt.now.return_value = fixed
+            c1 = core_module.GptCore(lambda: None, lambda *a: None, "gpt-5.4-mini")
+            c2 = core_module.GptCore(lambda: None, lambda *a: None, "gpt-5.4-mini")
+
+        assert c1.file != c2.file
 
 
 class TestAllModelsSmokeTest:

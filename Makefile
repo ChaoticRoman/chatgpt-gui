@@ -1,7 +1,6 @@
-.PHONY: test lint format
+.PHONY: all lint format test xtest
 
-test:
-	python -m pytest tests/ -v
+all: lint xtest
 
 lint:
 	ruff check .
@@ -9,3 +8,9 @@ lint:
 
 format:
 	ruff format .
+
+test:
+	python -m pytest tests/ -v
+
+xtest:
+	python -m pytest tests/ -v -n 16

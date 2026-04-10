@@ -1,4 +1,5 @@
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 import json
@@ -42,7 +43,9 @@ assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
 
 USD_PER_WEB_SEARCH_CALL = 0.01
 
-DATA_DIRECTORY = Path.home() / ".chatgpt-gui"
+DATA_DIRECTORY = Path(
+    os.environ.get("CHATGPT_GUI_DATA_DIR", Path.home() / ".chatgpt-gui")
+).expanduser()
 
 
 def load_key():
@@ -102,7 +105,7 @@ class GptCore:
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
         os.makedirs(DATA_DIRECTORY, exist_ok=True)
-        self.file = DATA_DIRECTORY / f"{timestamp}.json"
+        self.file = DATA_DIRECTORY / f"{timestamp}-{uuid.uuid4().hex[:8]}.json"
 
         self.client = openai.OpenAI()
 
@@ -120,6 +123,8 @@ class GptCore:
         assert purpose in ("vision", "user_data")
         with open(path, "rb") as f:
             file = self.client.files.create(file=f, purpose=purpose)
+        if os.environ.get("CHATGPT_CLI_LOG_UPLOADS"):
+            print(f"uploaded:{file.id}", file=sys.stderr)
         return file.id
 
     def _delete_file(self, file_id):

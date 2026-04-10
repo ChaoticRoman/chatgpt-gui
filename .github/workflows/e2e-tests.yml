@@ -37,9 +37,9 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: pip install openai rich pytest
+        run: pip install openai rich pytest pytest-xdist
 
       - name: Run E2E tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: make test
+        run: make xtest

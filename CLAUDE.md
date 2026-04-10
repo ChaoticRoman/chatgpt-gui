@@ -1,6 +1,4 @@
-# AGENTS.md
-
-Instructions for AI agents working on this repo.
+# Agents
 
 Read README.md.
 
@@ -11,9 +9,6 @@ Python CLI and GUI clients for OpenAI's ChatGPT. Key files:
 - `core.py` — shared library: `GptCore` class, pricing dicts, `Info` dataclass
 - `cli.py` — CLI client with interactive, batch, multiline, web-search, debug modes
 - `gui.py` — Tkinter GUI client with conversation browser
-- `whisper.py` — audio transcription tool
-- `dale.py` — DALL-E image generation tool
-- `test.py` — standalone quick-test script (not part of test suite)
 
 ## Development workflow
 
@@ -39,29 +34,17 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 
 - **Do not run the full suite speculatively.** Only run tests when you have a reason to believe something changed that could break them.
 - **Run specific tests** when possible: `python -m pytest tests/e2e_test.py::TestClassName::test_name -v`
-- The test model is `gpt-5.4-mini` (cheapest). Do not change this.
-- `tests/conftest.py` has an autouse fixture that cleans up conversation JSON files after each test.
-- Test assets: `tests/test.png`, `tests/test_apple.pdf`, `tests/test_banana.pdf`.
 
 ### Before committing
 
 1. `make format`
 2. `make lint` — must pass cleanly
-3. `make test` — only if your changes touch `core.py`, `cli.py`, or test files. Skip for README-only, GUI-only, or cosmetic changes.
 
 ## Code conventions
 
 - No `pyproject.toml` or `setup.py` — this is a flat script-based repo, not a package.
 - Imports: stdlib first, then third-party (`openai`, `rich`, etc.), then local (`core`). Ruff enforces this.
-- The `DEFAULT_MODEL` in `core.py` is the model used by `cli.py` and `gui.py` by default.
-- Pricing dicts (`USD_PER_INPUT_TOKEN`, `USD_PER_OUTPUT_TOKEN`) must stay in sync — there's an assert for this.
 - `GptCore` uses an input/output callback pattern — `input()` returns a string or `None`, `output(msg, info)` displays results.
-
-## When adding a new model
-
-1. Add entries to both `USD_PER_INPUT_TOKEN` and `USD_PER_OUTPUT_TOKEN` in `core.py`.
-2. Optionally update `DEFAULT_MODEL` if it becomes the new default.
-3. No test needed — the assert at module level catches mismatched keys.
 
 ## When adding a new CLI flag
 
@@ -79,15 +62,6 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 4. `make format && make lint`
 5. Run relevant tests if applicable (not for cosmetic/doc changes).
 
-## CI
-
-Three GitHub Actions workflows run on PRs to `main`:
-
-- **Ruff** (`.github/workflows/lint.yml`) — lint + format check
-- **E2E Tests** (`.github/workflows/e2e-tests.yml`) — full pytest suite against real OpenAI API
-  - Runs conditionally via file-change filters. When adding new source files or tests, check whether the workflow paths filter should be updated.
-- **Code Review** (`.github/workflows/code-review.yml`) — GPT-based code review
-
 ## Worktrees
 
 You may be running in a git worktree (e.g. `.claude/worktrees/...`). Your cwd is already set correctly — run `git`, `gh`, and other commands directly without `-C` or `cd`.
@@ -98,4 +72,4 @@ You may be running in a git worktree (e.g. `.claude/worktrees/...`). Your cwd is
 - Don't restructure into a package — the flat layout is intentional.
 - Don't add dependencies without strong justification.
 - Don't run `make test` for changes that don't touch core logic — it costs real money.
-- Don't modify `tests/conftest.py` cleanup logic without understanding the conversation file side effects.
+- Don't modify `tests/conftest.py` cleanup logic without understanding side effects.

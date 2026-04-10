@@ -8,7 +8,8 @@ from pprint import pprint
 
 import openai
 
-DEFAULT_MODEL = "gpt-5.3-codex"
+# Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
+DEFAULT_MODEL = "gpt-5.2-codex"
 
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = {
@@ -19,6 +20,7 @@ USD_PER_INPUT_TOKEN = {
     "gpt-5": 1.25e-6,
     "gpt-5.1": 1.25e-6,
     "gpt-5.2": 1.75e-6,
+    "gpt-5.2-codex": 1.75e-6,
     "gpt-5.3-codex": 1.75e-6,
     "gpt-5.4": 2.5e-6,
     "gpt-5.4-pro": 30e-6,
@@ -31,6 +33,7 @@ USD_PER_OUTPUT_TOKEN = {
     "gpt-5": 10e-6,
     "gpt-5.1": 10e-6,
     "gpt-5.2": 14e-6,
+    "gpt-5.2-codex": 14e-6,
     "gpt-5.3-codex": 14e-6,
     "gpt-5.4": 15e-6,
     "gpt-5.4-pro": 180e-6,

@@ -85,6 +85,7 @@ Three GitHub Actions workflows run on PRs to `main`:
 
 - **Ruff** (`.github/workflows/lint.yml`) — lint + format check
 - **E2E Tests** (`.github/workflows/e2e-tests.yml`) — full pytest suite against real OpenAI API
+  - Runs conditionally via file-change filters. When adding new source files or tests, check whether the workflow paths filter should be updated.
 - **Code Review** (`.github/workflows/code-review.yml`) — GPT-based code review
 
 ## Worktrees

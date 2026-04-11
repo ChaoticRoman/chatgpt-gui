@@ -7,6 +7,7 @@ Demonstrates vector search across multiple documents: uploads two fruit-themed
 PDFs from the tests/ directory, queries about the fruits mentioned in them,
 then cleans up the vector store and uploaded files.
 """
+
 import os
 import time
 
@@ -88,7 +89,10 @@ def render_output_item(o) -> str:
         return f"[File search]\nstatus={status} queries={queries}"
 
     if t == "reasoning":
-        return "[Reasoning]\n" + "\n".join(f"[Summary]\n{s.text}" for s in o.summary).strip()
+        return (
+            "[Reasoning]\n"
+            + "\n".join(f"[Summary]\n{s.text}" for s in o.summary).strip()
+        )
 
     return f"[{t or 'unknown'}] {o!r}"
 

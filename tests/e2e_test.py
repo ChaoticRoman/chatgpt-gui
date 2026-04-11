@@ -65,6 +65,25 @@ def parse_uploaded_ids(stderr):
     return ids
 
 
+def parse_logged_vs_ids(stderr):
+    """Return vector store IDs emitted by core when CHATGPT_CLI_LOG_UPLOADS is set."""
+    ids = set()
+    for line in stderr.splitlines():
+        if line.startswith("vector_store:"):
+            ids.add(line.split(":", 1)[1])
+    return ids
+
+
+def parse_listed_vs_ids(list_vs_stdout):
+    """Return the set of vector store IDs from --list-vector-stores output."""
+    ids = set()
+    for line in list_vs_stdout.splitlines():
+        stripped = line.strip()
+        if stripped and stripped != "No vector stores.":
+            ids.add(stripped.split()[0])
+    return ids
+
+
 class TestSingleTurn:
     """Single-turn conversations: one prompt then exit."""
 
@@ -348,6 +367,75 @@ class TestFileInput:
         assert not (uploaded & parse_file_ids(current_ids)), (
             f"Files not cleaned up: {uploaded}"
         )
+
+
+class TestVectorizeFile:
+    """Test vectorized file search with -vf/--vectorize-file."""
+
+    def _assert_cleanup(self, stderr):
+        uploaded = parse_uploaded_ids(stderr)
+        assert uploaded, "Expected files to be uploaded"
+        vs_ids = parse_logged_vs_ids(stderr)
+        assert vs_ids, "Expected a vector store to be created"
+
+        current_files, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+        assert not (uploaded & parse_file_ids(current_files)), (
+            f"Files not cleaned up: {uploaded}"
+        )
+
+        current_vs, _, rc = run_cli(
+            None, extra_args=["--list-vector-stores"], model=None
+        )
+        assert rc == 0
+        assert not (vs_ids & parse_listed_vs_ids(current_vs)), (
+            f"Vector stores not cleaned up: {vs_ids}"
+        )
+
+    def test_single_pdf(self):
+        """Single PDF vectorized: model can answer and resources are cleaned up."""
+        stdout, stderr, rc = run_cli(
+            "What fruit is mentioned? Reply with just the fruit.",
+            extra_args=["-b", "-vf", "tests/test_apple.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            timeout=120,
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0].lower() == "apple"
+        self._assert_cleanup(stderr)
+
+    def test_multiple_pdfs(self):
+        """Multiple PDFs vectorized: model can query both and resources are cleaned up."""
+        stdout, stderr, rc = run_cli(
+            "What fruits are mentioned across all documents? Reply: fruit1, fruit2.",
+            extra_args=["-b", "-vf", "tests/test_apple.pdf", "tests/test_banana.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            timeout=120,
+        )
+        assert rc == 0
+        response = get_responses(stdout)[0].lower()
+        assert "apple" in response
+        assert "banana" in response
+        self._assert_cleanup(stderr)
+
+    def test_available_across_turns(self):
+        """Vector store should be searchable on every turn, not just the first."""
+        stdin_text = (
+            "What fruit does the apple document mention? Reply with just the fruit.\n"
+            "And what color is associated with the fruit in the banana document? Reply with just the color.\n"
+            "q\n"
+        )
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-vf", "tests/test_apple.pdf", "tests/test_banana.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            timeout=180,
+        )
+        assert rc == 0
+        responses = get_responses(stdout)
+        assert "apple" in responses[0].lower()
+        assert "yellow" in responses[1].lower()
+        self._assert_cleanup(stderr)
 
 
 class TestConcurrency:

@@ -57,7 +57,7 @@ def cli_output(msg, info, rich=False):
         console.print(Markdown(msg))
     else:
         print(msg)
-    print(info)
+    print(info, file=sys.stderr)
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
         "-b",
         "--batch-mode",
         action="store_true",
-        help="No prompt, pricing info in stderr, quit after first response. For use with pipes/redirection.",
+        help="No prompt, quit after first response. For use with pipes/redirection.",
     )
     parser.add_argument(
         "-p",

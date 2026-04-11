@@ -45,7 +45,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | Flag | Description |
 |------|-------------|
 | `-m`, `--multiline` | Multiline input mode — type your message, then enter `SEND` to submit |
-| `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection (pricing info goes to stderr) |
+| `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection |
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
 | `-p`, `--prepend` | Prepend a file's contents to the first message |

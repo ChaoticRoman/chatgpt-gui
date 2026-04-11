@@ -39,10 +39,7 @@ def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL, extra_env
 
 def get_responses(stdout):
     return [
-        stripped
-        for line in stdout.split("\n")
-        if (stripped := line.replace("> ", ""))
-        and not line.startswith("Input tokens: ")
+        stripped for line in stdout.split("\n") if (stripped := line.replace("> ", ""))
     ]
 
 
@@ -97,12 +94,12 @@ class TestSingleTurn:
         stdout, stderr, rc = run_cli("q\n")
         assert rc == 0
         # No response content expected
-        assert "Input tokens" not in stdout
+        assert "Input tokens" not in stderr
 
     def test_exit_exit(self):
         stdout, stderr, rc = run_cli("exit\n")
         assert rc == 0
-        assert "Input tokens" not in stdout
+        assert "Input tokens" not in stderr
 
 
 class TestMultiturn:
@@ -299,10 +296,10 @@ class TestEdgeCases:
         assert len(stdout.strip()) > 0
 
     def test_pricing_info_displayed(self):
-        """Verify pricing info appears in interactive mode output."""
+        """Verify pricing info appears in stderr."""
         stdout, stderr, rc = run_cli("Say ok.\nq\n")
         assert rc == 0
-        assert "Input tokens:" in stdout
+        assert "Input tokens:" in stderr
 
 
 class TestImageInput:

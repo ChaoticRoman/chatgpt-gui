@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +11,7 @@ from pprint import pprint
 import openai
 
 # Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
-DEFAULT_MODEL = "gpt-5.2-codex"
+DEFAULT_MODEL = "gpt-5.4"
 
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = {
@@ -104,8 +105,9 @@ class GptCore:
         self.messages = []
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
+        self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"
         os.makedirs(DATA_DIRECTORY, exist_ok=True)
-        self.file = DATA_DIRECTORY / f"{timestamp}-{uuid.uuid4().hex[:8]}.json"
+        self.file = DATA_DIRECTORY / f"{self.conversation_id}.json"
 
         self.client = openai.OpenAI()
 
@@ -120,10 +122,12 @@ class GptCore:
 
     def _upload_file(self, path, purpose):
         """Upload a file and return the file ID."""
-        assert purpose in ("vision", "user_data")
+        assert purpose in ("vision", "user_data", "assistants")
+        print(f"Uploading {Path(path).name}...", end="", file=sys.stderr, flush=True)
         with open(path, "rb") as f:
             file = self.client.files.create(file=f, purpose=purpose)
-        if os.environ.get("CHATGPT_CLI_LOG_UPLOADS"):
+        print(" done.", file=sys.stderr)
+        if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
             print(f"uploaded:{file.id}", file=sys.stderr)
         return file.id
 
@@ -131,25 +135,80 @@ class GptCore:
         """Delete a previously uploaded file."""
         self.client.files.delete(file_id)
 
+    def _setup_vector_store(self, file_paths):
+        """Upload files to a new vector store and wait for processing to complete."""
+        vector_store = self.client.vector_stores.create(name=self.conversation_id)
+        self._vector_store_id = vector_store.id
+        if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
+            print(f"vector_store:{vector_store.id}", file=sys.stderr)
+        for path in file_paths:
+            file_id = self._upload_file(path, "assistants")
+            self._vector_files.append((Path(path).name, file_id))
+            self.client.vector_stores.files.create(
+                vector_store_id=vector_store.id,
+                file_id=file_id,
+            )
+        print("Processing...", end="", file=sys.stderr, flush=True)
+        while True:
+            vs = self.client.vector_stores.retrieve(vector_store.id)
+            if vs.status == "completed":
+                break
+            print(".", end="", file=sys.stderr, flush=True)
+            time.sleep(2)
+        print(" done.", file=sys.stderr)
+
+    def _teardown_vector_store(self):
+        """Delete the vector store and its files, printing progress."""
+        if self._vector_store_id:
+            print("Deleting vector store...", end="", file=sys.stderr, flush=True)
+            self.client.vector_stores.delete(self._vector_store_id)
+            print(" done.", file=sys.stderr)
+            for name, file_id in self._vector_files:
+                print(f"Deleting {name}...", end="", file=sys.stderr, flush=True)
+                self._delete_file(file_id)
+                print(" done.", file=sys.stderr)
+
+    def _teardown(self):
+        """Delete all uploaded files and the vector store."""
+        for name, file_id in self._images + self._files:
+            print(f"Deleting {name}...", end="", file=sys.stderr, flush=True)
+            self._delete_file(file_id)
+            print(" done.", file=sys.stderr)
+        self._teardown_vector_store()
+
     def send(self, prompt, image_path=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
         content = []
         if image_path:
-            self._image_file_id = self._upload_file(image_path, "vision")
-            content.append({"type": "input_image", "file_id": self._image_file_id})
+            name = Path(image_path).name
+            file_id = self._upload_file(image_path, "vision")
+            self._images.append((name, file_id))
+            content.append({"type": "input_image", "file_id": file_id})
         for path in file_paths or []:
+            name = Path(path).name
             file_id = self._upload_file(path, "user_data")
-            self._file_ids.append(file_id)
+            self._files.append((name, file_id))
             content.append({"type": "input_file", "file_id": file_id})
         content.append({"type": "input_text", "text": prompt})
         self.messages.append({"role": "user", "content": content})
 
-        kwargs = dict(model=self.model, input=self.messages)
+        tools = []
+        includes = []
         if self.web_search:
-            kwargs["tools"] = [{"type": "web_search"}]
-            kwargs["include"] = ["web_search_call.action.sources"]
+            tools.append({"type": "web_search"})
+            includes.append("web_search_call.action.sources")
+        if self._vector_store_id:
+            tools.append(
+                {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
+            )
 
-        response = self.client.responses.create(**kwargs)
+        kwargs = dict(model=self.model, input=self.messages)
+        if tools:
+            kwargs["tools"] = tools
+        if includes:
+            kwargs["include"] = includes
+
+        response = self.client.responses.create(**kwargs)  # pyright: ignore
 
         if self.debug:
             pprint(response.to_dict(), stream=sys.stderr)
@@ -178,19 +237,23 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
-    def main(self, image_path=None, file_paths=None):
-        self._image_file_id = None
-        self._file_ids = []
-        price = 0
+    def main(self, image_path=None, file_paths=None, vectorize_file_paths=None):
+        self._images = []
+        self._files = []
+        self._vector_store_id = None
+        self._vector_files = []
+        price = 0.0
         total_web_search_calls = 0
         try:
+            if vectorize_file_paths:
+                self._setup_vector_store(vectorize_file_paths)
             while prompt := self.input():
                 content, info = self.send(
                     prompt, image_path=image_path, file_paths=file_paths
                 )
                 image_path = None  # only attach files to the first message
                 file_paths = None
-                if info.price is not None:
+                if price is not None and info.price is not None:
                     price += info.price
                 else:
                     price = None
@@ -205,34 +268,38 @@ class GptCore:
                     ),
                 )
         finally:
-            if self._image_file_id:
-                self._delete_file(self._image_file_id)
-            for file_id in self._file_ids:
-                self._delete_file(file_id)
+            self._teardown()
 
-    def one_shot(self, image_path=None, file_paths=None):
-        self._image_file_id = None
-        self._file_ids = []
+    def one_shot(self, image_path=None, file_paths=None, vectorize_file_paths=None):
+        self._images = []
+        self._files = []
+        self._vector_store_id = None
+        self._vector_files = []
         prompt = self.input()
         if not prompt:
             return
         try:
+            if vectorize_file_paths:
+                self._setup_vector_store(vectorize_file_paths)
             content, info = self.send(
                 prompt, image_path=image_path, file_paths=file_paths
             )
             self.output(content, info)
         finally:
-            if self._image_file_id:
-                self._delete_file(self._image_file_id)
-            for file_id in self._file_ids:
-                self._delete_file(file_id)
+            self._teardown()
 
     def list_files(self):
         """Return list of (id, filename, bytes) tuples for uploaded files."""
         return [(f.id, f.filename, f.bytes) for f in self.client.files.list().data]
 
+    def list_vector_stores(self):
+        """Return list of (id, name, status) tuples for vector stores."""
+        return [
+            (vs.id, vs.name, vs.status) for vs in self.client.vector_stores.list().data
+        ]
+
     def list_models(self):
-        return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])
+        return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])  # type: ignore
 
 
 @dataclass

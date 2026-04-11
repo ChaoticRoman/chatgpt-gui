@@ -57,7 +57,7 @@ def cli_output(msg, info, rich=False):
         console.print(Markdown(msg))
     else:
         print(msg)
-    print(info)
+    print(info, file=sys.stderr)
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
         "-b",
         "--batch-mode",
         action="store_true",
-        help="No prompt, pricing info in stderr, quit after first response. For use with pipes/redirection.",
+        help="No prompt, quit after first response. For use with pipes/redirection.",
     )
     parser.add_argument(
         "-p",
@@ -90,14 +90,21 @@ def main():
         "-i",
         "--image",
         metavar="FILE",
-        help="Image file to include with the first message.",
+        help="Image file to include.",
     )
     parser.add_argument(
         "-f",
         "--file",
         nargs="+",
         metavar="FILE",
-        help="Document(s) to include with the first message.",
+        help="Document(s) to include.",
+    )
+    parser.add_argument(
+        "-vf",
+        "--vectorize-file",
+        nargs="+",
+        metavar="FILE",
+        help="Document(s) to upload to a vector store for semantic file search.",
     )
     parser.add_argument(
         "-r",
@@ -135,9 +142,20 @@ def main():
         action="store_true",
         help="List uploaded files.",
     )
+    parser.add_argument(
+        "-lv",
+        "--list-vector-stores",
+        action="store_true",
+        help="List vector stores.",
+    )
     args = parser.parse_args()
 
-    list_opts = [args.list_known, args.list_all, args.list_files]
+    list_opts = [
+        args.list_known,
+        args.list_all,
+        args.list_files,
+        args.list_vector_stores,
+    ]
     if (
         any(list_opts)
         and (
@@ -147,13 +165,14 @@ def main():
             or args.prepend
             or args.image
             or args.file
+            or args.vectorize_file
             or args.rich
             or args.web_search
             or args.debug
         )
     ) or sum(list_opts) > 1:
         parser.error(
-            "-l/--list-known, -L/--list-all, and -lf/--list-files "
+            "-l/--list-known, -L/--list-all, -lf/--list-files, and -lv/--list-vector-stores "
             "cannot be combined with each other or other options."
         )
 
@@ -178,6 +197,17 @@ def main():
             print(f"{fid:<{id_w}}  {name:<{name_w}}  {size:>10}")
         return
 
+    if args.list_vector_stores:
+        stores = core.GptCore(None, None, None).list_vector_stores()
+        if not stores:
+            print("No vector stores.")
+            return
+        id_w = max(len(s[0]) for s in stores)
+        name_w = max(len(s[1]) for s in stores)
+        for vsid, name, status in stores:
+            print(f"{vsid:<{id_w}}  {name:<{name_w}}  {status}")
+        return
+
     if args.batch_mode:
         prompt = sys.stdin.read().strip()
 
@@ -198,7 +228,11 @@ def main():
             args.model,
             web_search=args.web_search,
             debug=args.debug,
-        ).one_shot(image_path=args.image, file_paths=args.file)
+        ).one_shot(
+            image_path=args.image,
+            file_paths=args.file,
+            vectorize_file_paths=args.vectorize_file,
+        )
         return
 
     if args.multiline:
@@ -235,7 +269,11 @@ def main():
         model=args.model,
         web_search=args.web_search,
         debug=args.debug,
-    ).main(image_path=args.image, file_paths=args.file)
+    ).main(
+        image_path=args.image,
+        file_paths=args.file,
+        vectorize_file_paths=args.vectorize_file,
+    )
 
 
 if __name__ == "__main__":

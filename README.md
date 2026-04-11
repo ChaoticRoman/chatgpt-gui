@@ -45,16 +45,18 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | Flag | Description |
 |------|-------------|
 | `-m`, `--multiline` | Multiline input mode — type your message, then enter `SEND` to submit |
-| `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection (pricing info goes to stderr) |
+| `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection |
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
 | `-p`, `--prepend` | Prepend a file's contents to the first message |
-| `-i`, `--image` | Image file to include with the first message |
-| `-f`, `--file` | Document(s) to include with the first message |
+| `-i`, `--image` | Image file to include |
+| `-f`, `--file` | Document(s) to include |
+| `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
 | `-lf`, `--list-files` | List uploaded files |
+| `-lv`, `--list-vector-stores` | List vector stores |
 
 #### Batch Mode Examples
 
@@ -64,6 +66,8 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b --prepend summarize_prompt.txt < article.txt
 ./cli.py -b -f report.pdf <<< "Summarize this document"
 ./cli.py -b -f cv.pdf job.pdf <<< "Is this candidate a good fit?"
+./cli.py -b -vf contracts/*.pdf <<< "Which contracts mention arbitration?"
+./cli.py -vf docs/*.pdf  # interactive Q&A session across a document collection
 ```
 
 The tool is quite powerful with `guake` drop-down terminal and alias like this:

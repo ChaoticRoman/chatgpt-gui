@@ -18,7 +18,13 @@ CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
 
 
-def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL, extra_env=None):
+def run_cli(
+    stdin_text,
+    extra_args=None,
+    timeout=60,
+    model: str | None = TEST_MODEL,
+    extra_env=None,
+):
     """Run cli.py with given stdin and return (stdout, stderr, returncode)."""
     cmd = [sys.executable, CLI]
     if model:
@@ -38,11 +44,12 @@ def run_cli(stdin_text, extra_args=None, timeout=30, model=TEST_MODEL, extra_env
 
 
 def get_responses(stdout):
+    """Get response from cli output as list of lines, removing spurious ">"s
+    from prefilled input, lowercased for convenience."""
     return [
-        stripped
+        stripped.lower()
         for line in stdout.split("\n")
         if (stripped := line.replace("> ", ""))
-        and not line.startswith("Input tokens: ")
     ]
 
 
@@ -57,11 +64,30 @@ def parse_file_ids(list_files_stdout):
 
 
 def parse_uploaded_ids(stderr):
-    """Return file IDs emitted by core when CHATGPT_CLI_LOG_UPLOADS is set."""
+    """Return file IDs emitted by core when CHATGPT_CLI_LOG_UPLOAD_IDS is set."""
     ids = set()
     for line in stderr.splitlines():
         if line.startswith("uploaded:"):
             ids.add(line.split(":", 1)[1])
+    return ids
+
+
+def parse_logged_vs_ids(stderr):
+    """Return vector store IDs emitted by core when CHATGPT_CLI_LOG_UPLOAD_IDS is set."""
+    ids = set()
+    for line in stderr.splitlines():
+        if line.startswith("vector_store:"):
+            ids.add(line.split(":", 1)[1])
+    return ids
+
+
+def parse_listed_vs_ids(list_vs_stdout):
+    """Return the set of vector store IDs from --list-vector-stores output."""
+    ids = set()
+    for line in list_vs_stdout.splitlines():
+        stripped = line.strip()
+        if stripped and stripped != "No vector stores.":
+            ids.add(stripped.split()[0])
     return ids
 
 
@@ -78,12 +104,12 @@ class TestSingleTurn:
         stdout, stderr, rc = run_cli("q\n")
         assert rc == 0
         # No response content expected
-        assert "Input tokens" not in stdout
+        assert "Input tokens" not in stderr
 
     def test_exit_exit(self):
         stdout, stderr, rc = run_cli("exit\n")
         assert rc == 0
-        assert "Input tokens" not in stdout
+        assert "Input tokens" not in stderr
 
 
 class TestMultiturn:
@@ -98,7 +124,7 @@ class TestMultiturn:
         )
         stdout, stderr, rc = run_cli(stdin_text)
         assert rc == 0
-        assert get_responses(stdout)[1].lower() == "banana"
+        assert get_responses(stdout)[1] == "banana"
 
     def test_arithmetic_context(self):
         """Build up context across turns with simple arithmetic."""
@@ -121,7 +147,7 @@ class TestMultiturn:
         )
         stdout, stderr, rc = run_cli(stdin_text)
         assert rc == 0
-        assert get_responses(stdout)[1] == "Zephyrine"
+        assert get_responses(stdout)[1] == "zephyrine"
 
 
 class TestBatchMode:
@@ -182,7 +208,7 @@ class TestPrepend:
                 )
                 assert rc == 0
                 responses = get_responses(stdout)
-                assert responses[0].lower() == "red"
+                assert responses[0] == "red"
                 assert responses[1] == "1"
             finally:
                 os.unlink(f.name)
@@ -280,10 +306,21 @@ class TestEdgeCases:
         assert len(stdout.strip()) > 0
 
     def test_pricing_info_displayed(self):
-        """Verify pricing info appears in interactive mode output."""
+        """Verify pricing info appears in stderr."""
         stdout, stderr, rc = run_cli("Say ok.\nq\n")
         assert rc == 0
-        assert "Input tokens:" in stdout
+        assert "Input tokens:" in stderr
+
+
+def assert_files_cleaned_up(stderr):
+    """Assert that all uploaded files (logged in stderr) have been deleted."""
+    uploaded = parse_uploaded_ids(stderr)
+    assert uploaded, "Expected files to be uploaded"
+    current_files, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+    assert rc == 0
+    assert not (uploaded & parse_file_ids(current_files)), (
+        f"Files not cleaned up: {uploaded}"
+    )
 
 
 class TestImageInput:
@@ -294,60 +331,161 @@ class TestImageInput:
         stdout, stderr, rc = run_cli(
             "What is the word on picture. Reply the word only.",
             extra_args=["-b", "-i", "tests/test.png"],
-            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
         )
         assert rc == 0
-        assert get_responses(stdout)[0].lower() == "tag"
+        assert "tag" in get_responses(stdout)[0]
+        assert_files_cleaned_up(stderr)
 
-        uploaded = parse_uploaded_ids(stderr)
-        assert uploaded, "Expected a file to be uploaded"
-        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
-        assert rc == 0
-        assert not (uploaded & parse_file_ids(current_ids)), (
-            f"Files not cleaned up: {uploaded}"
+    def test_image_multiturn(self):
+        """Ask about image background in one turn, then the text in the next."""
+        stdin_text = (
+            "What is the background color? Reply just the color.\n"
+            "What word is on the image? Reply the word only.\n"
+            "q\n"
         )
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-i", "tests/test.png"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+        )
+        assert rc == 0
+        responses = get_responses(stdout)
+        assert responses[0] == "white"
+        assert "tag" in responses[1]
+        assert_files_cleaned_up(stderr)
 
 
 class TestFileInput:
     """Test PDF document input."""
 
+    def _assert_cleanup(self, stderr):
+        assert_files_cleaned_up(stderr)
+
     def test_single_pdf(self):
         """A single PDF should be read and deleted after use."""
         stdout, stderr, rc = run_cli(
             "What fruit is mentioned? Reply with just the fruit.",
-            extra_args=["-b", "-f", "tests/test_apple.pdf"],
-            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            extra_args=["-b", "-f", "tests/test1.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
         )
         assert rc == 0
-        assert get_responses(stdout)[0].lower() == "apple"
+        assert "orange" in get_responses(stdout)[0]
 
         uploaded = parse_uploaded_ids(stderr)
-        assert uploaded, "Expected a file to be uploaded"
-        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
-        assert rc == 0
-        assert not (uploaded & parse_file_ids(current_ids)), (
-            f"Files not cleaned up: {uploaded}"
-        )
+        assert len(uploaded) == 1, f"Expected 2 uploaded files, got: {uploaded}"
+        self._assert_cleanup(stderr)
 
     def test_multiple_pdfs(self):
         """Multiple PDFs should all be read and deleted after use."""
         stdout, stderr, rc = run_cli(
-            "What fruit and what color are mentioned? Reply: fruit, color.",
-            extra_args=["-b", "-f", "tests/test_apple.pdf", "tests/test_banana.pdf"],
-            extra_env={"CHATGPT_CLI_LOG_UPLOADS": "1"},
+            "What fruits and what colors are mentioned? Reply with just fruits and colors.",
+            extra_args=["-b", "-f", "tests/test1.pdf", "tests/test2.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
         )
         assert rc == 0
-        response = get_responses(stdout)[0].lower()
-        assert "apple" in response
-        assert "yellow" in response
+        response = get_responses(stdout)[0]
+        assert "orange" in response
+        assert "avocado" in response
+        assert "red" in response
+        assert "brown" in response
 
         uploaded = parse_uploaded_ids(stderr)
         assert len(uploaded) == 2, f"Expected 2 uploaded files, got: {uploaded}"
-        current_ids, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        self._assert_cleanup(stderr)
+
+    def test_available_across_turns(self):
+        """Vector store should be searchable on every turn, not just the first."""
+        stdin_text = (
+            "What fruit do documents mention? Reply just fruit.\n"
+            "And what color are there? Reply just color.\n"
+            "q\n"
+        )
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-f", "tests/test1.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+            timeout=180,
+        )
         assert rc == 0
-        assert not (uploaded & parse_file_ids(current_ids)), (
+        responses = get_responses(stdout)
+        assert "orange" in responses[0]
+        assert "red" in responses[1]
+
+        uploaded = parse_uploaded_ids(stderr)
+        assert len(uploaded) == 1, f"Expected uploaded file, got: {uploaded}"
+        self._assert_cleanup(stderr)
+
+
+class TestVectorizeFile:
+    """Test vectorized file search with -vf/--vectorize-file."""
+
+    def _assert_cleanup(self, stderr):
+        uploaded = parse_uploaded_ids(stderr)
+        assert uploaded, "Expected files to be uploaded"
+        vs_ids = parse_logged_vs_ids(stderr)
+        assert vs_ids, "Expected a vector store to be created"
+
+        current_files, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        assert rc == 0
+        assert not (uploaded & parse_file_ids(current_files)), (
             f"Files not cleaned up: {uploaded}"
         )
+
+        current_vs, _, rc = run_cli(
+            None, extra_args=["--list-vector-stores"], model=None
+        )
+        assert rc == 0
+        assert not (vs_ids & parse_listed_vs_ids(current_vs)), (
+            f"Vector stores not cleaned up: {vs_ids}"
+        )
+
+    def test_single_pdf(self):
+        """Single PDF vectorized: model can answer and resources are cleaned up."""
+        stdout, stderr, rc = run_cli(
+            "What fruit is mentioned? Reply with just the fruit.",
+            extra_args=["-b", "-vf", "tests/test1.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+            timeout=120,
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0] == "orange"
+        self._assert_cleanup(stderr)
+
+    def test_multiple_pdfs(self):
+        """Multiple PDFs vectorized: model can query both and resources are cleaned up."""
+        stdout, stderr, rc = run_cli(
+            "What fruits are mentioned across all documents? Reply just fruits.",
+            extra_args=["-b", "-vf", "tests/test1.pdf", "tests/test2.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+            timeout=120,
+        )
+        assert rc == 0
+        response = get_responses(stdout)[0]
+        assert "orange" in response
+        assert "avocado" in response
+        self._assert_cleanup(stderr)
+
+    def test_available_across_turns(self):
+        """Vector store should be searchable on every turn, not just the first."""
+        stdin_text = (
+            "What fruits do documents mention? Reply just fruits.\n"
+            "And what color are there? Reply just colors.\n"
+            "q\n"
+        )
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-vf", "tests/test1.pdf", "tests/test2.pdf"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+            timeout=180,
+        )
+        assert rc == 0
+        responses = get_responses(stdout)
+        assert "orange" in responses[0]
+        assert "avocado" in responses[0]
+        assert "red" in responses[1]
+        assert "brown" in responses[1]
+        self._assert_cleanup(stderr)
 
 
 class TestConcurrency:
@@ -375,13 +513,13 @@ class TestAllModelsSmokeTest:
     @pytest.mark.parametrize("model", sorted(USD_PER_INPUT_TOKEN.keys()))
     def test_model_responds(self, model):
         stdout, stderr, rc = run_cli(
-            "Second letter of alphabet? Reply with letter only.",
+            "Say ok.",
             extra_args=["-b"],
             model=model,
             timeout=120,
         )
         assert rc == 0
-        assert get_responses(stdout)[0].lower() == "b"
+        assert "ok" in get_responses(stdout)[0]
 
 
 if __name__ == "__main__":

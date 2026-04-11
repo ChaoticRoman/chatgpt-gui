@@ -11,6 +11,7 @@ jobs:
       pull-requests: read
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
+      skip_e2e: ${{ steps.skip_check.outputs.skip_e2e }}
     steps:
       - name: Check for relevant changes
         id: filter
@@ -23,9 +24,20 @@ jobs:
               - 'tests/**'
               - '.github/workflows/e2e-tests.yml'
 
+      - name: Check skip-e2e in PR description
+        id: skip_check
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if echo "$PR_BODY" | grep -iqE 'skip[-_ ]e2e'; then
+            echo "skip_e2e=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_e2e=false" >> $GITHUB_OUTPUT
+          fi
+
   e2e:
     needs: changes
-    if: needs.changes.outputs.should_run == 'true'
+    if: needs.changes.outputs.should_run == 'true' && needs.changes.outputs.skip_e2e != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

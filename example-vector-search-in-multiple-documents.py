@@ -28,8 +28,8 @@ print(f"Vector store created: id={vector_store.id} name={vector_store.name!r}")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 pdf_paths = [
-    os.path.join(script_dir, "tests", "test_apple.pdf"),
-    os.path.join(script_dir, "tests", "test_banana.pdf"),
+    os.path.join(script_dir, "tests", "test1.pdf"),
+    os.path.join(script_dir, "tests", "test2.pdf"),
 ]
 
 uploaded_file_ids = []
@@ -59,7 +59,7 @@ query = "What fruits are described in the documents? Summarise what each documen
 
 response = client.responses.create(
     input=query,
-    model="gpt-5.2",
+    model="gpt-5.4",
     tools=[
         {
             "type": "file_search",

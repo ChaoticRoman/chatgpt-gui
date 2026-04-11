@@ -41,7 +41,7 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 - **Run specific tests** when possible: `python -m pytest tests/e2e_test.py::TestClassName::test_name -v`
 - The test model is `gpt-5.4-mini` (cheapest). Do not change this.
 - `tests/conftest.py` has an autouse fixture that cleans up conversation JSON files after each test.
-- Test assets: `tests/test.png`, `tests/test_apple.pdf`, `tests/test_banana.pdf`.
+- Test assets: `tests/test.png`, `tests/test1.pdf`, `tests/test2.pdf`.
 
 ### Before committing
 

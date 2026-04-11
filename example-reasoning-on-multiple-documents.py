@@ -9,11 +9,11 @@ client = OpenAI()
 
 # Upload
 apple = client.files.create(
-    file=open("./tests/test_apple.pdf", "rb"),
+    file=open("./tests/test1.pdf", "rb"),
     purpose="user_data",
 )
 banana = client.files.create(
-    file=open("./tests/test_banana.pdf", "rb"),
+    file=open("./tests/test2.pdf", "rb"),
     purpose="user_data",
 )
 

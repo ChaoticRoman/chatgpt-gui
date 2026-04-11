@@ -11,7 +11,7 @@ from pprint import pprint
 import openai
 
 # Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
-DEFAULT_MODEL = "gpt-5.2-codex"
+DEFAULT_MODEL = "gpt-5.4"
 
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = {

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from openai import OpenAI
 
 from core import load_key

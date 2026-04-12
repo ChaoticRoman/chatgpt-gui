@@ -124,6 +124,7 @@ def main():
     vectors_del_parser.add_argument(
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID to delete."
     )
+    vectors_sub.add_parser("purge", help="Delete all vector stores.")
     vectors_files_parser = vectors_sub.add_parser(
         "files", help="Manage files in a vector store."
     )
@@ -137,13 +138,32 @@ def main():
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
     )
     vectors_files_add_parser = vectors_files_sub.add_parser(
-        "add", help="Add file(s) to a vector store."
+        "add", help="Upload file(s) and add to a vector store."
     )
     vectors_files_add_parser.add_argument(
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
     )
     vectors_files_add_parser.add_argument(
+        "files", nargs="+", metavar="FILE", help="File path(s) to upload and add."
+    )
+    vectors_files_add_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
+    )
+    vectors_files_add_id_parser = vectors_files_sub.add_parser(
+        "add-id", help="Add already-uploaded file(s) to a vector store by ID."
+    )
+    vectors_files_add_id_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_id_parser.add_argument(
         "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to add."
+    )
+    vectors_files_add_id_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
     )
     vectors_files_del_parser = vectors_files_sub.add_parser(
         "delete", help="Remove file(s) from a vector store."
@@ -261,10 +281,8 @@ def main():
             for file_id in args.ids:
                 gpt.delete_file(file_id)
         elif args.files_command == "purge":
-            for file_id, name, *_ in gpt.list_files():
-                print(f"Deleting {name} ({file_id})...", end="", flush=True)
+            for file_id, *_ in gpt.list_files():
                 gpt.delete_file(file_id)
-                print(" done.")
         else:
             files_parser.print_help()
         return
@@ -291,6 +309,9 @@ def main():
             print(vs_id)
         elif args.vectors_command == "delete":
             gpt.delete_vector_store(args.id)
+        elif args.vectors_command == "purge":
+            for vsid, *_ in gpt.list_vector_stores():
+                gpt.delete_vector_store(vsid)
         elif args.vectors_command == "files":
             if args.vectors_files_command == "list":
                 files = gpt.list_vector_store_files(args.id)
@@ -302,8 +323,16 @@ def main():
                 ]
                 print_table(("ID", "STATUS", "CREATED_AT"), rows)
             elif args.vectors_files_command == "add":
+                for path in args.files:
+                    file_id = gpt.upload_file(path, "assistants")
+                    gpt.add_vector_store_file(args.id, file_id)
+                if not args.no_wait:
+                    gpt.wait_for_vector_store(args.id)
+            elif args.vectors_files_command == "add-id":
                 for file_id in args.file_ids:
                     gpt.add_vector_store_file(args.id, file_id)
+                if not args.no_wait:
+                    gpt.wait_for_vector_store(args.id)
             elif args.vectors_files_command == "delete":
                 for file_id in args.file_ids:
                     gpt.delete_vector_store_file(args.id, file_id)

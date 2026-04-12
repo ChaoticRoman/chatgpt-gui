@@ -138,7 +138,9 @@ class GptCore:
 
     def delete_file(self, file_id):
         """Delete a previously uploaded file."""
+        print(f"Deleting {file_id}...", end="", file=sys.stderr, flush=True)
         self.client.files.delete(file_id)
+        print(" done.", file=sys.stderr)
 
     def wait_for_vector_store(self, vs_id):
         """Block until a vector store has finished indexing."""
@@ -165,22 +167,16 @@ class GptCore:
         self.wait_for_vector_store(vector_store.id)
 
     def _teardown_vector_store(self):
-        """Delete the vector store and its files, printing progress."""
+        """Delete the vector store and its files."""
         if self._vector_store_id and self._vector_store_owned:
-            print("Deleting vector store...", end="", file=sys.stderr, flush=True)
             self.delete_vector_store(self._vector_store_id)
-            print(" done.", file=sys.stderr)
-            for name, file_id in self._vector_files:
-                print(f"Deleting {name}...", end="", file=sys.stderr, flush=True)
+            for _, file_id in self._vector_files:
                 self.delete_file(file_id)
-                print(" done.", file=sys.stderr)
 
     def _teardown(self):
         """Delete all uploaded files and the vector store."""
-        for name, file_id in self._images + self._files:
-            print(f"Deleting {name}...", end="", file=sys.stderr, flush=True)
+        for _, file_id in self._images + self._files:
             self.delete_file(file_id)
-            print(" done.", file=sys.stderr)
         self._teardown_vector_store()
 
     def send(self, prompt, image_path=None, file_paths=None):
@@ -334,7 +330,9 @@ class GptCore:
 
     def delete_vector_store(self, vs_id):
         """Delete a vector store by ID."""
+        print(f"Deleting {vs_id}...", end="", file=sys.stderr, flush=True)
         self.client.vector_stores.delete(vs_id)
+        print(" done.", file=sys.stderr)
 
     def list_vector_stores(self):
         """Return list of (id, name, status, created_at) tuples for vector stores."""
@@ -356,7 +354,9 @@ class GptCore:
 
     def delete_vector_store_file(self, vs_id, file_id):
         """Remove a file from a vector store."""
+        print(f"Deleting {file_id}...", end="", file=sys.stderr, flush=True)
         self.client.vector_stores.files.delete(vector_store_id=vs_id, file_id=file_id)
+        print(" done.", file=sys.stderr)
 
     def list_models(self):
         return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])  # type: ignore

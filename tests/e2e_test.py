@@ -681,7 +681,7 @@ class TestVectorsSubcommand:
             run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
             raise
 
-    def test_files_add_list_delete(self):
+    def test_files_add_id_list_delete(self):
         # Upload a file to use
         stdout, _, rc = run_cli(
             None, extra_args=["files", "add", "tests/test1.pdf"], model=None
@@ -699,10 +699,10 @@ class TestVectorsSubcommand:
         assert vs_id.startswith("vs_")
 
         try:
-            # Add file to vector store
+            # Add file to vector store by ID
             _, _, rc = run_cli(
                 None,
-                extra_args=["vectors", "files", "add", vs_id, file_id],
+                extra_args=["vectors", "files", "add-id", vs_id, file_id],
                 model=None,
             )
             assert rc == 0
@@ -732,6 +732,50 @@ class TestVectorsSubcommand:
         finally:
             run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
             run_cli(None, extra_args=["files", "delete", file_id], model=None)
+
+    def test_files_add_by_path(self):
+        """'vectors files add' uploads a file by path and adds it to the vector store."""
+        # Create a vector store
+        stdout, _, rc = run_cli(
+            None, extra_args=["vectors", "create", "test-vs-add-path"], model=None
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+
+        try:
+            # Add file by path (upload + add)
+            _, _, rc = run_cli(
+                None,
+                extra_args=["vectors", "files", "add", vs_id, "tests/test1.pdf"],
+                model=None,
+                timeout=60,
+            )
+            assert rc == 0
+
+            time.sleep(5)
+            # File must appear in vector store file listing
+            stdout, _, rc = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            assert rc == 0
+            file_ids = [
+                line.split()[0]
+                for line in stdout.splitlines()
+                if line.split() and line.split()[0].startswith("file-")
+            ]
+            assert file_ids, "Expected at least one file in vector store"
+        finally:
+            files, _, _ = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+            for fid in (
+                line.split()[0]
+                for line in files.splitlines()
+                if line.split() and line.split()[0].startswith("file-")
+            ):
+                run_cli(None, extra_args=["files", "delete", fid], model=None)
 
 
 class TestConcurrency:

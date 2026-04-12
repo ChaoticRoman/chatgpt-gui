@@ -78,6 +78,52 @@ def main():
     )
     files_sub.add_parser("purge", help="Delete all uploaded files.")
 
+    vectors_parser = subparsers.add_parser("vectors", help="Manage vector stores.")
+    vectors_sub = vectors_parser.add_subparsers(dest="vectors_command")
+    vectors_sub.add_parser("list", help="List vector stores.")
+    vectors_create_parser = vectors_sub.add_parser(
+        "create", help="Create a vector store."
+    )
+    vectors_create_parser.add_argument(
+        "name", metavar="NAME", help="Name for the vector store."
+    )
+    vectors_del_parser = vectors_sub.add_parser(
+        "delete", help="Delete a vector store by ID."
+    )
+    vectors_del_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID to delete."
+    )
+    vectors_files_parser = vectors_sub.add_parser(
+        "files", help="Manage files in a vector store."
+    )
+    vectors_files_sub = vectors_files_parser.add_subparsers(
+        dest="vectors_files_command"
+    )
+    vectors_files_list_parser = vectors_files_sub.add_parser(
+        "list", help="List files in a vector store."
+    )
+    vectors_files_list_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_parser = vectors_files_sub.add_parser(
+        "add", help="Add file(s) to a vector store."
+    )
+    vectors_files_add_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_parser.add_argument(
+        "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to add."
+    )
+    vectors_files_del_parser = vectors_files_sub.add_parser(
+        "delete", help="Remove file(s) from a vector store."
+    )
+    vectors_files_del_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_del_parser.add_argument(
+        "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to remove."
+    )
+
     parser.add_argument(
         "-m",
         "--multiline",
@@ -211,6 +257,82 @@ def main():
             files_parser.print_help()
         return
 
+    if args.command == "vectors":
+        core.load_key()
+        gpt = core.GptCore(None, None, None)
+        if args.vectors_command == "list":
+            stores = gpt.list_vector_stores()
+            if not stores:
+                return
+
+            def fmt_ts(ts):
+                if ts is None:
+                    return ""
+                return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                )
+
+            rows = [
+                (vsid, name, status, fmt_ts(created_at))
+                for vsid, name, status, created_at in stores
+            ]
+            headers = ("ID", "NAME", "STATUS", "CREATED_AT")
+            widths = [
+                max(len(headers[i]), max(len(r[i]) for r in rows))
+                for i in range(len(headers))
+            ]
+
+            def fmt_row(row):
+                return "  ".join(f"{val:<{widths[i]}}" for i, val in enumerate(row))
+
+            print(fmt_row(headers))
+            for row in rows:
+                print(fmt_row(row))
+        elif args.vectors_command == "create":
+            print(gpt.create_vector_store(args.name))
+        elif args.vectors_command == "delete":
+            gpt.delete_vector_store(args.id)
+        elif args.vectors_command == "files":
+            if args.vectors_files_command == "list":
+                files = gpt.list_vector_store_files(args.id)
+                if not files:
+                    return
+
+                def fmt_ts(ts):
+                    if ts is None:
+                        return ""
+                    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%S"
+                    )
+
+                rows = [
+                    (fid, status, fmt_ts(created_at))
+                    for fid, status, created_at in files
+                ]
+                headers = ("ID", "STATUS", "CREATED_AT")
+                widths = [
+                    max(len(headers[i]), max(len(r[i]) for r in rows))
+                    for i in range(len(headers))
+                ]
+
+                def fmt_row(row):
+                    return "  ".join(f"{val:<{widths[i]}}" for i, val in enumerate(row))
+
+                print(fmt_row(headers))
+                for row in rows:
+                    print(fmt_row(row))
+            elif args.vectors_files_command == "add":
+                for file_id in args.file_ids:
+                    gpt.add_vector_store_file(args.id, file_id)
+            elif args.vectors_files_command == "delete":
+                for file_id in args.file_ids:
+                    gpt.delete_vector_store_file(args.id, file_id)
+            else:
+                vectors_files_parser.print_help()
+        else:
+            vectors_parser.print_help()
+        return
+
     list_opts = [args.list_known, args.list_all, args.list_vector_stores]
     if (
         any(list_opts)
@@ -247,10 +369,26 @@ def main():
         if not stores:
             print("No vector stores.")
             return
-        id_w = max(len(s[0]) for s in stores)
-        name_w = max(len(s[1]) for s in stores)
-        for vsid, name, status in stores:
-            print(f"{vsid:<{id_w}}  {name:<{name_w}}  {status}")
+
+        def fmt_ts_lv(ts):
+            if ts is None:
+                return ""
+            return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
+
+        rows_lv = [
+            (vsid, name, status, fmt_ts_lv(created_at))
+            for vsid, name, status, created_at in stores
+        ]
+        headers_lv = ("ID", "NAME", "STATUS", "CREATED_AT")
+        widths_lv = [
+            max(len(headers_lv[i]), max(len(r[i]) for r in rows_lv))
+            for i in range(len(headers_lv))
+        ]
+        print("  ".join(f"{h:<{widths_lv[i]}}" for i, h in enumerate(headers_lv)))
+        for row in rows_lv:
+            print("  ".join(f"{val:<{widths_lv[i]}}" for i, val in enumerate(row)))
         return
 
     if args.batch_mode:

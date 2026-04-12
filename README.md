@@ -66,6 +66,17 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py files purge                  # delete all uploaded files
 ```
 
+#### Vector Store Management
+
+```bash
+./cli.py vectors list                                        # list vector stores
+./cli.py vectors create NAME                                 # create a vector store, prints the vector store ID
+./cli.py vectors delete VECTOR_STORE_ID                      # delete a vector store
+./cli.py vectors files list VECTOR_STORE_ID                  # list files in a vector store
+./cli.py vectors files add VECTOR_STORE_ID FILE_ID ...       # add one or more files to a vector store
+./cli.py vectors files delete VECTOR_STORE_ID FILE_ID ...    # remove one or more files from a vector store
+```
+
 #### Batch Mode Examples
 
 ```bash

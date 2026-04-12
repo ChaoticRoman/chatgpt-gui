@@ -302,11 +302,36 @@ class GptCore:
             for f in self.client.files.list().data
         ]
 
+    def create_vector_store(self, name):
+        """Create a new vector store and return its ID."""
+        vs = self.client.vector_stores.create(name=name)
+        return vs.id
+
+    def delete_vector_store(self, vs_id):
+        """Delete a vector store by ID."""
+        self.client.vector_stores.delete(vs_id)
+
     def list_vector_stores(self):
-        """Return list of (id, name, status) tuples for vector stores."""
+        """Return list of (id, name, status, created_at) tuples for vector stores."""
         return [
-            (vs.id, vs.name, vs.status) for vs in self.client.vector_stores.list().data
+            (vs.id, vs.name or "", vs.status, vs.created_at)
+            for vs in self.client.vector_stores.list().data
         ]
+
+    def list_vector_store_files(self, vs_id):
+        """Return list of (id, status, created_at) tuples for files in a vector store."""
+        return [
+            (f.id, f.status, f.created_at)
+            for f in self.client.vector_stores.files.list(vector_store_id=vs_id).data
+        ]
+
+    def add_vector_store_file(self, vs_id, file_id):
+        """Add a file to a vector store."""
+        self.client.vector_stores.files.create(vector_store_id=vs_id, file_id=file_id)
+
+    def delete_vector_store_file(self, vs_id, file_id):
+        """Remove a file from a vector store."""
+        self.client.vector_stores.files.delete(vector_store_id=vs_id, file_id=file_id)
 
     def list_models(self):
         return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])  # type: ignore

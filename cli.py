@@ -53,6 +53,29 @@ def cli_input_multiline():
     return user_input
 
 
+def fmt_ts(ts):
+    if ts is None:
+        return ""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def print_table(headers, rows, right_align=()):
+    widths = [
+        max(len(headers[i]), max(len(r[i]) for r in rows)) for i in range(len(headers))
+    ]
+
+    def fmt_row(row):
+        parts = [
+            f"{val:>{widths[i]}}" if i in right_align else f"{val:<{widths[i]}}"
+            for i, val in enumerate(row)
+        ]
+        return "  ".join(parts)
+
+    print(fmt_row(headers))
+    for row in rows:
+        print(fmt_row(row))
+
+
 def cli_output(msg, info, rich=False):
     if rich and sys.stdout.isatty():
         console.print(Markdown(msg))
@@ -213,34 +236,15 @@ def main():
             files = gpt.list_files()
             if not files:
                 return
-
-            def fmt_ts(ts):
-                if ts is None:
-                    return ""
-                return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
-                    "%Y-%m-%dT%H:%M:%S"
-                )
-
             rows = [
                 (fid, name, str(size), purpose, fmt_ts(created_at), fmt_ts(expires_at))
                 for fid, name, size, purpose, created_at, expires_at in files
             ]
-            headers = ("ID", "FILENAME", "SIZE", "PURPOSE", "CREATED_AT", "EXPIRES_AT")
-            widths = [
-                max(len(headers[i]), max(len(r[i]) for r in rows))
-                for i in range(len(headers))
-            ]
-
-            def fmt_row(row):
-                parts = [
-                    f"{val:>{widths[i]}}" if i == 2 else f"{val:<{widths[i]}}"
-                    for i, val in enumerate(row)
-                ]
-                return "  ".join(parts)
-
-            print(fmt_row(headers))
-            for row in rows:
-                print(fmt_row(row))
+            print_table(
+                ("ID", "FILENAME", "SIZE", "PURPOSE", "CREATED_AT", "EXPIRES_AT"),
+                rows,
+                right_align=(2,),
+            )
         elif args.files_command == "add":
             for path in args.files:
                 file_id = gpt.upload_file(path, "user_data")
@@ -264,30 +268,11 @@ def main():
             stores = gpt.list_vector_stores()
             if not stores:
                 return
-
-            def fmt_ts(ts):
-                if ts is None:
-                    return ""
-                return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
-                    "%Y-%m-%dT%H:%M:%S"
-                )
-
             rows = [
                 (vsid, name, status, fmt_ts(created_at))
                 for vsid, name, status, created_at in stores
             ]
-            headers = ("ID", "NAME", "STATUS", "CREATED_AT")
-            widths = [
-                max(len(headers[i]), max(len(r[i]) for r in rows))
-                for i in range(len(headers))
-            ]
-
-            def fmt_row(row):
-                return "  ".join(f"{val:<{widths[i]}}" for i, val in enumerate(row))
-
-            print(fmt_row(headers))
-            for row in rows:
-                print(fmt_row(row))
+            print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         elif args.vectors_command == "create":
             print(gpt.create_vector_store(args.name))
         elif args.vectors_command == "delete":
@@ -297,30 +282,11 @@ def main():
                 files = gpt.list_vector_store_files(args.id)
                 if not files:
                     return
-
-                def fmt_ts(ts):
-                    if ts is None:
-                        return ""
-                    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
-                        "%Y-%m-%dT%H:%M:%S"
-                    )
-
                 rows = [
                     (fid, status, fmt_ts(created_at))
                     for fid, status, created_at in files
                 ]
-                headers = ("ID", "STATUS", "CREATED_AT")
-                widths = [
-                    max(len(headers[i]), max(len(r[i]) for r in rows))
-                    for i in range(len(headers))
-                ]
-
-                def fmt_row(row):
-                    return "  ".join(f"{val:<{widths[i]}}" for i, val in enumerate(row))
-
-                print(fmt_row(headers))
-                for row in rows:
-                    print(fmt_row(row))
+                print_table(("ID", "STATUS", "CREATED_AT"), rows)
             elif args.vectors_files_command == "add":
                 for file_id in args.file_ids:
                     gpt.add_vector_store_file(args.id, file_id)
@@ -370,25 +336,11 @@ def main():
             print("No vector stores.")
             return
 
-        def fmt_ts_lv(ts):
-            if ts is None:
-                return ""
-            return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
-                "%Y-%m-%dT%H:%M:%S"
-            )
-
-        rows_lv = [
-            (vsid, name, status, fmt_ts_lv(created_at))
+        rows = [
+            (vsid, name, status, fmt_ts(created_at))
             for vsid, name, status, created_at in stores
         ]
-        headers_lv = ("ID", "NAME", "STATUS", "CREATED_AT")
-        widths_lv = [
-            max(len(headers_lv[i]), max(len(r[i]) for r in rows_lv))
-            for i in range(len(headers_lv))
-        ]
-        print("  ".join(f"{h:<{widths_lv[i]}}" for i, h in enumerate(headers_lv)))
-        for row in rows_lv:
-            print("  ".join(f"{val:<{widths_lv[i]}}" for i, val in enumerate(row)))
+        print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         return
 
     if args.batch_mode:

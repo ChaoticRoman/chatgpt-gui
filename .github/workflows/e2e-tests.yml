@@ -11,7 +11,7 @@ jobs:
       pull-requests: read
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
-      skip_e2e: ${{ steps.skip_check.outputs.skip_e2e }}
+      skip_e2e: ${{ steps.skip_check.outputs.detected }}
     steps:
       - name: Check for relevant changes
         id: filter
@@ -26,14 +26,10 @@ jobs:
 
       - name: Check skip-e2e in PR description
         id: skip_check
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          if echo "$PR_BODY" | grep -iqE 'skip[-_ ]e2e'; then
-            echo "skip_e2e=true" >> $GITHUB_OUTPUT
-          else
-            echo "skip_e2e=false" >> $GITHUB_OUTPUT
-          fi
+        uses: ChaoticRoman/phrase-in-pr-description@v2
+        with:
+          phrase: 'skip[ -_]e2e'
+
 
   e2e:
     needs: changes

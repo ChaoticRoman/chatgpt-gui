@@ -144,10 +144,7 @@ class GptCore:
         for path in file_paths:
             file_id = self.upload_file(path, "assistants")
             self._vector_files.append((Path(path).name, file_id))
-            self.client.vector_stores.files.create(
-                vector_store_id=vector_store.id,
-                file_id=file_id,
-            )
+            self.add_vector_store_file(vector_store.id, file_id)
         print("Processing...", end="", file=sys.stderr, flush=True)
         while True:
             vs = self.client.vector_stores.retrieve(vector_store.id)
@@ -161,7 +158,7 @@ class GptCore:
         """Delete the vector store and its files, printing progress."""
         if self._vector_store_id:
             print("Deleting vector store...", end="", file=sys.stderr, flush=True)
-            self.client.vector_stores.delete(self._vector_store_id)
+            self.delete_vector_store(self._vector_store_id)
             print(" done.", file=sys.stderr)
             for name, file_id in self._vector_files:
                 print(f"Deleting {name}...", end="", file=sys.stderr, flush=True)

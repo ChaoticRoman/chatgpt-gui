@@ -55,8 +55,16 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
-| `-lf`, `--list-files` | List uploaded files |
 | `-lv`, `--list-vector-stores` | List vector stores |
+
+#### File Management
+
+```bash
+./cli.py files list                   # list uploaded files
+./cli.py files add report.pdf         # upload a file, prints the file ID
+./cli.py files delete FILE_ID ...     # delete one or more files by ID
+./cli.py files purge                  # delete all uploaded files
+```
 
 #### Batch Mode Examples
 
@@ -106,11 +114,6 @@ highlighting.
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
 - **`dale.py`** — generate images using DALL-E 3
-- **`delete-file.py`** — delete one or more uploaded files by ID
-
-```bash
-./delete-file.py FILE_ID [FILE_ID ...]
-```
 
 ## Development
 

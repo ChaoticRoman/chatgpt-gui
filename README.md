@@ -55,7 +55,6 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
-| `-lv`, `--list-vector-stores` | List vector stores |
 
 #### File Management
 

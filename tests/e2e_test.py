@@ -83,7 +83,7 @@ def parse_logged_vs_ids(stderr):
 
 
 def parse_listed_vs_ids(list_vs_stdout):
-    """Return the set of vector store IDs from --list-vector-stores or vectors list output."""
+    """Return the set of vector store IDs from vectors list output."""
     ids = set()
     for line in list_vs_stdout.splitlines():
         first = line.split()[0] if line.split() else ""
@@ -433,9 +433,7 @@ class TestVectorizeFile:
             f"Files not cleaned up: {uploaded}"
         )
 
-        current_vs, _, rc = run_cli(
-            None, extra_args=["--list-vector-stores"], model=None
-        )
+        current_vs, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
         assert rc == 0
         assert not (vs_ids & parse_listed_vs_ids(current_vs)), (
             f"Vector stores not cleaned up: {vs_ids}"

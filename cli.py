@@ -221,12 +221,6 @@ def main():
         action="store_true",
         help="List all models available.",
     )
-    parser.add_argument(
-        "-lv",
-        "--list-vector-stores",
-        action="store_true",
-        help="List vector stores.",
-    )
     args = parser.parse_args()
 
     if args.command == "files":
@@ -299,7 +293,7 @@ def main():
             vectors_parser.print_help()
         return
 
-    list_opts = [args.list_known, args.list_all, args.list_vector_stores]
+    list_opts = [args.list_known, args.list_all]
     if (
         any(list_opts)
         and (
@@ -316,7 +310,7 @@ def main():
         )
     ) or sum(list_opts) > 1:
         parser.error(
-            "-l/--list-known, -L/--list-all, and -lv/--list-vector-stores "
+            "-l/--list-known and -L/--list-all "
             "cannot be combined with each other or other options."
         )
 
@@ -328,19 +322,6 @@ def main():
 
     if args.list_all:
         [print(m) for m in core.GptCore(None, None, None).list_models()]
-        return
-
-    if args.list_vector_stores:
-        stores = core.GptCore(None, None, None).list_vector_stores()
-        if not stores:
-            print("No vector stores.")
-            return
-
-        rows = [
-            (vsid, name, status, fmt_ts(created_at))
-            for vsid, name, status, created_at in stores
-        ]
-        print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         return
 
     if args.batch_mode:

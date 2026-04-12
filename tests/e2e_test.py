@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 import pytest
 
@@ -54,12 +55,12 @@ def get_responses(stdout):
 
 
 def parse_file_ids(list_files_stdout):
-    """Return the set of file IDs from --list-files output."""
+    """Return the set of file IDs from 'files list' output."""
     ids = set()
     for line in list_files_stdout.splitlines():
-        stripped = line.strip()
-        if stripped and stripped != "No files.":
-            ids.add(stripped.split()[0])
+        first = line.split()[0] if line.split() else ""
+        if first.startswith("file-"):
+            ids.add(first)
     return ids
 
 
@@ -82,12 +83,12 @@ def parse_logged_vs_ids(stderr):
 
 
 def parse_listed_vs_ids(list_vs_stdout):
-    """Return the set of vector store IDs from --list-vector-stores output."""
+    """Return the set of vector store IDs from --list-vector-stores or vectors list output."""
     ids = set()
     for line in list_vs_stdout.splitlines():
-        stripped = line.strip()
-        if stripped and stripped != "No vector stores.":
-            ids.add(stripped.split()[0])
+        first = line.split()[0] if line.split() else ""
+        if first.startswith("vs_"):
+            ids.add(first)
     return ids
 
 
@@ -316,7 +317,7 @@ def assert_files_cleaned_up(stderr):
     """Assert that all uploaded files (logged in stderr) have been deleted."""
     uploaded = parse_uploaded_ids(stderr)
     assert uploaded, "Expected files to be uploaded"
-    current_files, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+    current_files, _, rc = run_cli(None, extra_args=["files", "list"], model=None)
     assert rc == 0
     assert not (uploaded & parse_file_ids(current_files)), (
         f"Files not cleaned up: {uploaded}"
@@ -426,7 +427,7 @@ class TestVectorizeFile:
         vs_ids = parse_logged_vs_ids(stderr)
         assert vs_ids, "Expected a vector store to be created"
 
-        current_files, _, rc = run_cli(None, extra_args=["--list-files"], model=None)
+        current_files, _, rc = run_cli(None, extra_args=["files", "list"], model=None)
         assert rc == 0
         assert not (uploaded & parse_file_ids(current_files)), (
             f"Files not cleaned up: {uploaded}"
@@ -486,6 +487,125 @@ class TestVectorizeFile:
         assert "red" in responses[1]
         assert "brown" in responses[1]
         self._assert_cleanup(stderr)
+
+
+class TestFilesSubcommand:
+    """Test 'files list', 'files add', and 'files delete' subcommands."""
+
+    def test_list_add_delete(self):
+        # Upload a file; file ID must appear on stdout
+        stdout, _, rc = run_cli(
+            None, extra_args=["files", "add", "tests/test1.pdf"], model=None
+        )
+        assert rc == 0
+        file_id = stdout.strip()
+        assert file_id
+
+        try:
+            # Newly uploaded file must appear in the listing
+            stdout, _, rc = run_cli(None, extra_args=["files", "list"], model=None)
+            assert rc == 0
+            assert file_id in parse_file_ids(stdout)
+
+            # Delete it
+            _, _, rc = run_cli(
+                None, extra_args=["files", "delete", file_id], model=None
+            )
+            assert rc == 0
+
+            # Must no longer appear in the listing
+            stdout, _, rc = run_cli(None, extra_args=["files", "list"], model=None)
+            assert rc == 0
+            assert file_id not in parse_file_ids(stdout)
+        except Exception:
+            run_cli(None, extra_args=["files", "delete", file_id], model=None)
+            raise
+
+
+class TestVectorsSubcommand:
+    """Test 'vectors list', 'vectors create', 'vectors delete', and 'vectors files' subcommands."""
+
+    def test_list_create_delete(self):
+        # Create a vector store
+        stdout, _, rc = run_cli(
+            None, extra_args=["vectors", "create", "test-vs"], model=None
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+
+        try:
+            time.sleep(5)
+            # Newly created store must appear in listing
+            stdout, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
+            assert rc == 0
+            assert vs_id in parse_listed_vs_ids(stdout)
+
+            # Delete it
+            _, _, rc = run_cli(
+                None, extra_args=["vectors", "delete", vs_id], model=None
+            )
+            assert rc == 0
+
+            # Must no longer appear in listing
+            stdout, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
+            assert rc == 0
+            assert vs_id not in parse_listed_vs_ids(stdout)
+        except Exception:
+            run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+            raise
+
+    def test_files_add_list_delete(self):
+        # Upload a file to use
+        stdout, _, rc = run_cli(
+            None, extra_args=["files", "add", "tests/test1.pdf"], model=None
+        )
+        assert rc == 0
+        file_id = stdout.strip()
+        assert file_id.startswith("file-")
+
+        # Create a vector store
+        stdout, _, rc = run_cli(
+            None, extra_args=["vectors", "create", "test-vs-files"], model=None
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+
+        try:
+            # Add file to vector store
+            _, _, rc = run_cli(
+                None,
+                extra_args=["vectors", "files", "add", vs_id, file_id],
+                model=None,
+            )
+            assert rc == 0
+
+            time.sleep(5)
+            # File must appear in vector store file listing
+            stdout, _, rc = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            assert rc == 0
+            assert file_id in stdout
+
+            # Remove file from vector store
+            _, _, rc = run_cli(
+                None,
+                extra_args=["vectors", "files", "delete", vs_id, file_id],
+                model=None,
+            )
+            assert rc == 0
+
+            # File must no longer appear in listing
+            stdout, _, rc = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            assert rc == 0
+            assert file_id not in stdout
+        finally:
+            run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+            run_cli(None, extra_args=["files", "delete", file_id], model=None)
 
 
 class TestConcurrency:

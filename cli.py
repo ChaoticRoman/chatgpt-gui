@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from datetime import datetime, timezone
 from functools import partial
 import sys
 
@@ -52,6 +53,29 @@ def cli_input_multiline():
     return user_input
 
 
+def fmt_ts(ts):
+    if ts is None:
+        return ""
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def print_table(headers, rows, right_align=()):
+    widths = [
+        max(len(headers[i]), max(len(r[i]) for r in rows)) for i in range(len(headers))
+    ]
+
+    def fmt_row(row):
+        parts = [
+            f"{val:>{widths[i]}}" if i in right_align else f"{val:<{widths[i]}}"
+            for i, val in enumerate(row)
+        ]
+        return "  ".join(parts)
+
+    print(fmt_row(headers))
+    for row in rows:
+        print(fmt_row(row))
+
+
 def cli_output(msg, info, rich=False):
     if rich and sys.stdout.isatty():
         console.print(Markdown(msg))
@@ -62,6 +86,67 @@ def cli_output(msg, info, rich=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Interact with OpenAI's LLMs.")
+    subparsers = parser.add_subparsers(dest="command")
+
+    files_parser = subparsers.add_parser("files", help="Manage uploaded files.")
+    files_sub = files_parser.add_subparsers(dest="files_command")
+    files_sub.add_parser("list", help="List uploaded files.")
+    files_add_parser = files_sub.add_parser("add", help="Upload file(s).")
+    files_add_parser.add_argument(
+        "files", nargs="+", metavar="FILE", help="File(s) to upload."
+    )
+    files_del_parser = files_sub.add_parser("delete", help="Delete file(s) by ID.")
+    files_del_parser.add_argument(
+        "ids", nargs="+", metavar="FILE_ID", help="File ID(s) to delete."
+    )
+    files_sub.add_parser("purge", help="Delete all uploaded files.")
+
+    vectors_parser = subparsers.add_parser("vectors", help="Manage vector stores.")
+    vectors_sub = vectors_parser.add_subparsers(dest="vectors_command")
+    vectors_sub.add_parser("list", help="List vector stores.")
+    vectors_create_parser = vectors_sub.add_parser(
+        "create", help="Create a vector store."
+    )
+    vectors_create_parser.add_argument(
+        "name", metavar="NAME", help="Name for the vector store."
+    )
+    vectors_del_parser = vectors_sub.add_parser(
+        "delete", help="Delete a vector store by ID."
+    )
+    vectors_del_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID to delete."
+    )
+    vectors_files_parser = vectors_sub.add_parser(
+        "files", help="Manage files in a vector store."
+    )
+    vectors_files_sub = vectors_files_parser.add_subparsers(
+        dest="vectors_files_command"
+    )
+    vectors_files_list_parser = vectors_files_sub.add_parser(
+        "list", help="List files in a vector store."
+    )
+    vectors_files_list_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_parser = vectors_files_sub.add_parser(
+        "add", help="Add file(s) to a vector store."
+    )
+    vectors_files_add_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_parser.add_argument(
+        "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to add."
+    )
+    vectors_files_del_parser = vectors_files_sub.add_parser(
+        "delete", help="Remove file(s) from a vector store."
+    )
+    vectors_files_del_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_del_parser.add_argument(
+        "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to remove."
+    )
+
     parser.add_argument(
         "-m",
         "--multiline",
@@ -137,12 +222,6 @@ def main():
         help="List all models available.",
     )
     parser.add_argument(
-        "-lf",
-        "--list-files",
-        action="store_true",
-        help="List uploaded files.",
-    )
-    parser.add_argument(
         "-lv",
         "--list-vector-stores",
         action="store_true",
@@ -150,12 +229,77 @@ def main():
     )
     args = parser.parse_args()
 
-    list_opts = [
-        args.list_known,
-        args.list_all,
-        args.list_files,
-        args.list_vector_stores,
-    ]
+    if args.command == "files":
+        core.load_key()
+        gpt = core.GptCore(None, None, None)
+        if args.files_command == "list":
+            files = gpt.list_files()
+            if not files:
+                return
+            rows = [
+                (fid, name, str(size), purpose, fmt_ts(created_at), fmt_ts(expires_at))
+                for fid, name, size, purpose, created_at, expires_at in files
+            ]
+            print_table(
+                ("ID", "FILENAME", "SIZE", "PURPOSE", "CREATED_AT", "EXPIRES_AT"),
+                rows,
+                right_align=(2,),
+            )
+        elif args.files_command == "add":
+            for path in args.files:
+                file_id = gpt.upload_file(path, "user_data")
+                print(file_id)
+        elif args.files_command == "delete":
+            for file_id in args.ids:
+                gpt.delete_file(file_id)
+        elif args.files_command == "purge":
+            for file_id, name, *_ in gpt.list_files():
+                print(f"Deleting {name} ({file_id})...", end="", flush=True)
+                gpt.delete_file(file_id)
+                print(" done.")
+        else:
+            files_parser.print_help()
+        return
+
+    if args.command == "vectors":
+        core.load_key()
+        gpt = core.GptCore(None, None, None)
+        if args.vectors_command == "list":
+            stores = gpt.list_vector_stores()
+            if not stores:
+                return
+            rows = [
+                (vsid, name, status, fmt_ts(created_at))
+                for vsid, name, status, created_at in stores
+            ]
+            print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
+        elif args.vectors_command == "create":
+            print(gpt.create_vector_store(args.name))
+        elif args.vectors_command == "delete":
+            gpt.delete_vector_store(args.id)
+        elif args.vectors_command == "files":
+            if args.vectors_files_command == "list":
+                files = gpt.list_vector_store_files(args.id)
+                if not files:
+                    return
+                rows = [
+                    (fid, status, fmt_ts(created_at))
+                    for fid, status, created_at in files
+                ]
+                print_table(("ID", "STATUS", "CREATED_AT"), rows)
+            elif args.vectors_files_command == "add":
+                for file_id in args.file_ids:
+                    gpt.add_vector_store_file(args.id, file_id)
+            elif args.vectors_files_command == "delete":
+                for file_id in args.file_ids:
+                    gpt.delete_vector_store_file(args.id, file_id)
+            else:
+                vectors_files_parser.print_help()
+        else:
+            vectors_parser.print_help()
+        return
+
+    list_opts = [args.list_known, args.list_all, args.list_vector_stores]
     if (
         any(list_opts)
         and (
@@ -172,7 +316,7 @@ def main():
         )
     ) or sum(list_opts) > 1:
         parser.error(
-            "-l/--list-known, -L/--list-all, -lf/--list-files, and -lv/--list-vector-stores "
+            "-l/--list-known, -L/--list-all, and -lv/--list-vector-stores "
             "cannot be combined with each other or other options."
         )
 
@@ -186,26 +330,17 @@ def main():
         [print(m) for m in core.GptCore(None, None, None).list_models()]
         return
 
-    if args.list_files:
-        files = core.GptCore(None, None, None).list_files()
-        if not files:
-            print("No files.")
-            return
-        id_w = max(len(f[0]) for f in files)
-        name_w = max(len(f[1]) for f in files)
-        for fid, name, size in files:
-            print(f"{fid:<{id_w}}  {name:<{name_w}}  {size:>10}")
-        return
-
     if args.list_vector_stores:
         stores = core.GptCore(None, None, None).list_vector_stores()
         if not stores:
             print("No vector stores.")
             return
-        id_w = max(len(s[0]) for s in stores)
-        name_w = max(len(s[1]) for s in stores)
-        for vsid, name, status in stores:
-            print(f"{vsid:<{id_w}}  {name:<{name_w}}  {status}")
+
+        rows = [
+            (vsid, name, status, fmt_ts(created_at))
+            for vsid, name, status, created_at in stores
+        ]
+        print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         return
 
     if args.batch_mode:

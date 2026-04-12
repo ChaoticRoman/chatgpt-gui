@@ -55,8 +55,27 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
-| `-lf`, `--list-files` | List uploaded files |
 | `-lv`, `--list-vector-stores` | List vector stores |
+
+#### File Management
+
+```bash
+./cli.py files list                   # list uploaded files
+./cli.py files add report.pdf         # upload a file, prints the file ID
+./cli.py files delete FILE_ID ...     # delete one or more files by ID
+./cli.py files purge                  # delete all uploaded files
+```
+
+#### Vector Store Management
+
+```bash
+./cli.py vectors list                                        # list vector stores
+./cli.py vectors create NAME                                 # create a vector store, prints the vector store ID
+./cli.py vectors delete VECTOR_STORE_ID                      # delete a vector store
+./cli.py vectors files list VECTOR_STORE_ID                  # list files in a vector store
+./cli.py vectors files add VECTOR_STORE_ID FILE_ID ...       # add one or more files to a vector store
+./cli.py vectors files delete VECTOR_STORE_ID FILE_ID ...    # remove one or more files from a vector store
+```
 
 #### Batch Mode Examples
 
@@ -106,11 +125,6 @@ highlighting.
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
 - **`dale.py`** — generate images using DALL-E 3
-- **`delete-file.py`** — delete one or more uploaded files by ID
-
-```bash
-./delete-file.py FILE_ID [FILE_ID ...]
-```
 
 ## Development
 

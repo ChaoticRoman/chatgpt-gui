@@ -315,13 +315,17 @@ def main():
         )
 
     if args.list_known:
-        [print(m) for m in sorted(core.USD_PER_INPUT_TOKEN.keys())]
+        known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
+        for m in known_models:
+            print(m)
         return
 
     core.load_key()
 
     if args.list_all:
-        [print(m) for m in core.GptCore(None, None, None).list_models()]
+        all_models = core.GptCore(None, None, None).list_models()
+        for m in all_models:
+            print(m)
         return
 
     if args.batch_mode:

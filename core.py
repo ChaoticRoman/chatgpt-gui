@@ -79,7 +79,7 @@ def _extract_sources(response):
 
 class GptCore:
     """
-    A class to interact with OpenAI's GPT-4 model.
+    A class to interact with OpenAI's API.
 
     Attributes
     ----------
@@ -95,7 +95,7 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model, web_search=False, debug=False):
+    def __init__(self, input, output, model, web_search=False, debug=False):  # noqa: A002 (input is a callback, not the builtin)
         self.input = input
         self.output = output
         self.model = model
@@ -103,6 +103,10 @@ class GptCore:
         self.debug = debug
 
         self.messages = []
+        self._images = []
+        self._files = []
+        self._vector_store_id = None
+        self._vector_files = []
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
         self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"

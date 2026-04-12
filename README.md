@@ -1,6 +1,6 @@
-# ChatGPT Python Clients
+# OpenAI API Clients
 
-Python CLI and GUI clients for OpenAI's ChatGPT. Simple, no arguments required to get started.
+Python CLI and GUI clients to interact with OpenAI' API.
 
 ## Installation
 
@@ -22,8 +22,8 @@ pip install openai tkinterweb mistletoe pygments
 
 ### API Key
 
-Expects `.api_key` file in the repo directory with your OpenAI API key. The filename is
-in `.gitignore` already.
+Expects an `OPENAI_API_KEY` environment variable, or a `.api_key` file in the repo
+directory as a fallback. The filename is in `.gitignore` already.
 
 Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`. Override the
 location with the `CHATGPT_GUI_DATA_DIR` environment variable:
@@ -52,6 +52,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-i`, `--image` | Image file to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
+| `-r`, `--rich` | Render Markdown with rich text formatting in the terminal |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
@@ -123,20 +124,14 @@ highlighting.
 ### Other Tools
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
-- **`dale.py`** — generate images using DALL-E 3
+- **`dale.py`** — generate images using DALL-E 3 (`./dale.py "prompt" [-n N] [-j N]`)
 
 ## Development
 
-To run tests, install `pytest`:
+Install test dependencies:
 
-```
-pip3 install pytest
-```
-
-To run tests in parallel, install also `pytest-xdist` extension:
-
-```
-pip3 install pytest-xdist
+```bash
+pip install pytest pytest-xdist
 ```
 
 Format, lint, and test with:
@@ -144,7 +139,8 @@ Format, lint, and test with:
 ```bash
 make format
 make lint
-make xtest  # Remove x for sequential test
+make test   # sequential
+make xtest  # parallel (16 workers)
 ```
 
 Run a single test suite:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
+import argparse
+import multiprocessing
 import os
-import time
-
-# import multiprocessing
 import random
 import string
+import time
 
 from openai import OpenAI
 
@@ -31,8 +31,35 @@ def generate(prompt):
     os.system(f'wget -O "{filename}" "{url}"')
 
 
-prompt = input("Prompt: ")
-amount = int(input("Amount: "))
-# p = multiprocessing.Pool(10)
-for _ in range(amount):
-    generate(prompt)
+def main():
+    parser = argparse.ArgumentParser(description="Generate images using DALL-E 3.")
+    parser.add_argument("prompt", help="Image generation prompt.")
+    parser.add_argument(
+        "-n",
+        "--amount",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of images to generate (default: 1).",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel workers (default: 1).",
+    )
+    args = parser.parse_args()
+
+    prompts = [args.prompt] * args.amount
+    if args.jobs > 1:
+        with multiprocessing.Pool(args.jobs) as pool:
+            pool.map(generate, prompts)
+    else:
+        for p in prompts:
+            generate(p)
+
+
+if __name__ == "__main__":
+    main()

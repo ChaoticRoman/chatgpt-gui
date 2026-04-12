@@ -137,8 +137,8 @@ class JsonViewerApp(tk.Tk):
 
         # Create GptCore instance
         self.gpt_core = GptCore(
-            input=lambda: None,  # Not used in GUI mode
-            output=self.handle_output,
+            input=None,
+            output=None,
             model=model,
         )
 
@@ -193,11 +193,6 @@ class JsonViewerApp(tk.Tk):
             self.after(0, lambda: self.send_button.config(state="normal"))
             self.after(0, lambda: self.input_text.config(state="normal"))
             self.after(0, lambda: self.input_text.focus())
-
-    def handle_output(self, content, info):
-        """Handle output from GptCore (callback)."""
-        # This is called by GptCore but we handle display differently in GUI
-        pass
 
     # context switch to allow code to check CTRL+C in console
     def check(self):

@@ -199,8 +199,44 @@ class JsonViewerApp(tk.Tk):
         self.after(250, self.check)
 
 
-def format_json(j):
-    return "\n\n".join([f"**{m['role'].upper()}:**\n\n{m['content']}" for m in j])
+def format_message(message):
+    role = message["role"]
+    content = extract_content(message["content"])
+
+    if role == "user":
+        # our renderer is also HTML interpret, so careful about <>
+        # (One would think that this should go to LLM-produced text as well
+        # but it almost always format its  correctly )
+        content = content.replace("<", "&lt;").replace(">", "&gt;")
+
+        # Prevent newlines entered by user (note that this has to go after the previous line)
+        content = content.replace("\n", "<br />\n")
+
+    if role == "assistant":
+        # Math symbols formatting that our renderer does not support
+        content = content.replace("\\(", "<i>").replace("\\)", "</i>")
+        content = content.replace("\\[", "<i>").replace("\\]", "</i>")
+
+    return f"**{role.upper()}:**\n\n{content}"
+
+
+def extract_content(content):
+    # New format is [{"type": "input_text", "text": <CONTENT>}, ...]
+    if isinstance(content, list):
+        for item in content:
+            if (
+                isinstance(item, dict)
+                and item.get("type") == "input_text"
+                and "text" in item
+            ):
+                return item["text"]
+
+    # Old format is simply <CONTENT>
+    return content
+
+
+def format_json(conversation_json):
+    return "\n\n".join([format_message(message) for message in conversation_json])
 
 
 class CustomPygmentsRenderer(PygmentsRenderer):

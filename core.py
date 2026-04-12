@@ -106,6 +106,7 @@ class GptCore:
         self._images = []
         self._files = []
         self._vector_store_id = None
+        self._vector_store_owned = False
         self._vector_files = []
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
@@ -139,28 +140,33 @@ class GptCore:
         """Delete a previously uploaded file."""
         self.client.files.delete(file_id)
 
-    def _setup_vector_store(self, file_paths):
-        """Upload files to a new vector store and wait for processing to complete."""
-        vector_store = self.client.vector_stores.create(name=self.conversation_id)
-        self._vector_store_id = vector_store.id
-        if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
-            print(f"vector_store:{vector_store.id}", file=sys.stderr)
-        for path in file_paths:
-            file_id = self.upload_file(path, "assistants")
-            self._vector_files.append((Path(path).name, file_id))
-            self.add_vector_store_file(vector_store.id, file_id)
+    def wait_for_vector_store(self, vs_id):
+        """Block until a vector store has finished indexing."""
         print("Processing...", end="", file=sys.stderr, flush=True)
         while True:
-            vs = self.client.vector_stores.retrieve(vector_store.id)
+            vs = self.client.vector_stores.retrieve(vs_id)
             if vs.status == "completed":
                 break
             print(".", end="", file=sys.stderr, flush=True)
             time.sleep(2)
         print(" done.", file=sys.stderr)
 
+    def _setup_vector_store(self, file_paths):
+        """Upload files to a new vector store and wait for processing to complete."""
+        vector_store = self.client.vector_stores.create(name=self.conversation_id)
+        self._vector_store_id = vector_store.id
+        self._vector_store_owned = True
+        if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
+            print(f"vector_store:{vector_store.id}", file=sys.stderr)
+        for path in file_paths:
+            file_id = self.upload_file(path, "assistants")
+            self._vector_files.append((Path(path).name, file_id))
+            self.add_vector_store_file(vector_store.id, file_id)
+        self.wait_for_vector_store(vector_store.id)
+
     def _teardown_vector_store(self):
         """Delete the vector store and its files, printing progress."""
-        if self._vector_store_id:
+        if self._vector_store_id and self._vector_store_owned:
             print("Deleting vector store...", end="", file=sys.stderr, flush=True)
             self.delete_vector_store(self._vector_store_id)
             print(" done.", file=sys.stderr)
@@ -238,15 +244,24 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
-    def main(self, image_path=None, file_paths=None, vectorize_file_paths=None):
+    def main(
+        self,
+        image_path=None,
+        file_paths=None,
+        vectorize_file_paths=None,
+        vector_store_id=None,
+    ):
         self._images = []
         self._files = []
         self._vector_store_id = None
+        self._vector_store_owned = False
         self._vector_files = []
         price = 0.0
         total_web_search_calls = 0
         try:
-            if vectorize_file_paths:
+            if vector_store_id:
+                self._vector_store_id = vector_store_id
+            elif vectorize_file_paths:
                 self._setup_vector_store(vectorize_file_paths)
             while prompt := self.input():
                 content, info = self.send(
@@ -271,16 +286,25 @@ class GptCore:
         finally:
             self._teardown()
 
-    def one_shot(self, image_path=None, file_paths=None, vectorize_file_paths=None):
+    def one_shot(
+        self,
+        image_path=None,
+        file_paths=None,
+        vectorize_file_paths=None,
+        vector_store_id=None,
+    ):
         self._images = []
         self._files = []
         self._vector_store_id = None
+        self._vector_store_owned = False
         self._vector_files = []
         prompt = self.input()
         if not prompt:
             return
         try:
-            if vectorize_file_paths:
+            if vector_store_id:
+                self._vector_store_id = vector_store_id
+            elif vectorize_file_paths:
                 self._setup_vector_store(vectorize_file_paths)
             content, info = self.send(
                 prompt, image_path=image_path, file_paths=file_paths

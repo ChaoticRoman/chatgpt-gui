@@ -110,6 +110,14 @@ def main():
     vectors_create_parser.add_argument(
         "name", metavar="NAME", help="Name for the vector store."
     )
+    vectors_create_parser.add_argument(
+        "files", nargs="*", metavar="FILE", help="File(s) to upload and add."
+    )
+    vectors_create_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
+    )
     vectors_del_parser = vectors_sub.add_parser(
         "delete", help="Delete a vector store by ID."
     )
@@ -192,6 +200,12 @@ def main():
         help="Document(s) to upload to a vector store for semantic file search.",
     )
     parser.add_argument(
+        "-vs",
+        "--vector-store",
+        metavar="ID",
+        help="Use a pre-existing vector store by ID for semantic file search.",
+    )
+    parser.add_argument(
         "-r",
         "--rich",
         action="store_true",
@@ -268,7 +282,13 @@ def main():
             ]
             print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         elif args.vectors_command == "create":
-            print(gpt.create_vector_store(args.name))
+            vs_id = gpt.create_vector_store(args.name)
+            for path in args.files:
+                file_id = gpt.upload_file(path, "assistants")
+                gpt.add_vector_store_file(vs_id, file_id)
+            if args.files and not args.no_wait:
+                gpt.wait_for_vector_store(vs_id)
+            print(vs_id)
         elif args.vectors_command == "delete":
             gpt.delete_vector_store(args.id)
         elif args.vectors_command == "files":
@@ -304,6 +324,7 @@ def main():
             or args.image
             or args.file
             or args.vectorize_file
+            or args.vector_store
             or args.rich
             or args.web_search
             or args.debug
@@ -313,6 +334,9 @@ def main():
             "-l/--list-known and -L/--list-all "
             "cannot be combined with each other or other options."
         )
+
+    if args.vectorize_file and args.vector_store:
+        parser.error("--vectorize-file and --vector-store cannot be used together.")
 
     if args.list_known:
         known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
@@ -352,6 +376,7 @@ def main():
             image_path=args.image,
             file_paths=args.file,
             vectorize_file_paths=args.vectorize_file,
+            vector_store_id=args.vector_store,
         )
         return
 
@@ -393,6 +418,7 @@ def main():
         image_path=args.image,
         file_paths=args.file,
         vectorize_file_paths=args.vectorize_file,
+        vector_store_id=args.vector_store,
     )
 
 

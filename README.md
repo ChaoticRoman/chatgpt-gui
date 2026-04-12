@@ -52,6 +52,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-i`, `--image` | Image file to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
+| `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search |
 | `-r`, `--rich` | Render Markdown with rich text formatting in the terminal |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
@@ -70,7 +71,9 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 
 ```bash
 ./cli.py vectors list                                        # list vector stores
-./cli.py vectors create NAME                                 # create a vector store, prints the vector store ID
+./cli.py vectors create NAME                                 # create an empty vector store, prints the vector store ID
+./cli.py vectors create NAME doc1.pdf doc2.pdf               # create a vector store, upload and index files, prints the ID
+./cli.py vectors create NAME doc.pdf --no-wait               # same but return immediately without waiting for indexing
 ./cli.py vectors delete VECTOR_STORE_ID                      # delete a vector store
 ./cli.py vectors files list VECTOR_STORE_ID                  # list files in a vector store
 ./cli.py vectors files add VECTOR_STORE_ID FILE_ID ...       # add one or more files to a vector store
@@ -87,6 +90,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b -f cv.pdf job.pdf <<< "Is this candidate a good fit?"
 ./cli.py -b -vf contracts/*.pdf <<< "Which contracts mention arbitration?"
 ./cli.py -vf docs/*.pdf  # interactive Q&A session across a document collection
+./cli.py -vs vs_abc123   # interactive Q&A using a pre-existing vector store
 ```
 
 The tool is quite powerful with `guake` drop-down terminal and alias like this:

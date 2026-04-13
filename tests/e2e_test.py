@@ -83,7 +83,7 @@ def parse_logged_vs_ids(stderr):
 
 
 def parse_listed_vs_ids(list_vs_stdout):
-    """Return the set of vector store IDs from --list-vector-stores or vectors list output."""
+    """Return the set of vector store IDs from vectors list output."""
     ids = set()
     for line in list_vs_stdout.splitlines():
         first = line.split()[0] if line.split() else ""
@@ -433,9 +433,7 @@ class TestVectorizeFile:
             f"Files not cleaned up: {uploaded}"
         )
 
-        current_vs, _, rc = run_cli(
-            None, extra_args=["--list-vector-stores"], model=None
-        )
+        current_vs, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
         assert rc == 0
         assert not (vs_ids & parse_listed_vs_ids(current_vs)), (
             f"Vector stores not cleaned up: {vs_ids}"
@@ -487,6 +485,134 @@ class TestVectorizeFile:
         assert "red" in responses[1]
         assert "brown" in responses[1]
         self._assert_cleanup(stderr)
+
+
+class TestVectorStore:
+    """Test -vs/--vector-store: use a pre-existing vector store."""
+
+    def _setup(self):
+        """Create a vector store with test1.pdf already indexed; return vs_id."""
+        stdout, _, rc = run_cli(
+            None,
+            extra_args=["vectors", "create", "test-vs-flag", "tests/test1.pdf"],
+            model=None,
+            timeout=120,
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+        return vs_id
+
+    def _teardown(self, vs_id):
+        files, _, _ = run_cli(
+            None, extra_args=["vectors", "files", "list", vs_id], model=None
+        )
+        run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+        for file_id in (
+            line.split()[0]
+            for line in files.splitlines()
+            if line.split() and line.split()[0].startswith("file-")
+        ):
+            run_cli(None, extra_args=["files", "delete", file_id], model=None)
+
+    def _assert_vs_survives(self, vs_id):
+        """Verify the vector store was NOT deleted by the CLI session."""
+        current_vs, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
+        assert rc == 0
+        assert vs_id in parse_listed_vs_ids(current_vs), (
+            f"Vector store {vs_id} was deleted but should have been preserved"
+        )
+
+    def test_batch_query(self):
+        """Content from a pre-existing vector store is accessible in batch mode."""
+        vs_id = self._setup()
+        try:
+            stdout, _, rc = run_cli(
+                "What fruit is mentioned? Reply with just the fruit.",
+                extra_args=["-b", "-vs", vs_id],
+                timeout=60,
+            )
+            assert rc == 0
+            assert "orange" in get_responses(stdout)[0]
+            self._assert_vs_survives(vs_id)
+        finally:
+            self._teardown(vs_id)
+
+    def test_available_across_turns(self):
+        """Pre-existing vector store is searchable across interactive turns."""
+        vs_id = self._setup()
+        try:
+            stdin_text = (
+                "What fruit do documents mention? Reply just the fruit.\n"
+                "What color is mentioned? Reply just the color.\n"
+                "q\n"
+            )
+            stdout, _, rc = run_cli(
+                stdin_text,
+                extra_args=["-vs", vs_id],
+                timeout=120,
+            )
+            assert rc == 0
+            responses = get_responses(stdout)
+            assert "orange" in responses[0]
+            assert "red" in responses[1]
+            self._assert_vs_survives(vs_id)
+        finally:
+            self._teardown(vs_id)
+
+
+class TestVectorsCreate:
+    """Test 'vectors create' with file upload and --no-wait."""
+
+    def test_create_with_files_waits_and_is_queryable(self):
+        """Creating a VS with files should index them and make content searchable."""
+        stdout, _, rc = run_cli(
+            None,
+            extra_args=["vectors", "create", "test-vs-create", "tests/test1.pdf"],
+            model=None,
+            timeout=120,
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+        try:
+            stdout, _, rc = run_cli(
+                "What fruit is mentioned? Reply with just the fruit.",
+                extra_args=["-b", "-vs", vs_id],
+                timeout=60,
+            )
+            assert rc == 0
+            assert "orange" in get_responses(stdout)[0]
+        finally:
+            files, _, _ = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+            for file_id in (
+                line.split()[0]
+                for line in files.splitlines()
+                if line.split() and line.split()[0].startswith("file-")
+            ):
+                run_cli(None, extra_args=["files", "delete", file_id], model=None)
+
+    def test_no_wait_returns_before_completion(self):
+        """--no-wait should return the VS ID immediately without blocking."""
+        stdout, _, rc = run_cli(
+            None,
+            extra_args=[
+                "vectors",
+                "create",
+                "test-vs-nowait",
+                "tests/test1.pdf",
+                "--no-wait",
+            ],
+            model=None,
+            timeout=30,
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+        run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
 
 
 class TestFilesSubcommand:
@@ -555,7 +681,7 @@ class TestVectorsSubcommand:
             run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
             raise
 
-    def test_files_add_list_delete(self):
+    def test_files_add_id_list_delete(self):
         # Upload a file to use
         stdout, _, rc = run_cli(
             None, extra_args=["files", "add", "tests/test1.pdf"], model=None
@@ -573,10 +699,10 @@ class TestVectorsSubcommand:
         assert vs_id.startswith("vs_")
 
         try:
-            # Add file to vector store
+            # Add file to vector store by ID
             _, _, rc = run_cli(
                 None,
-                extra_args=["vectors", "files", "add", vs_id, file_id],
+                extra_args=["vectors", "files", "add-id", vs_id, file_id],
                 model=None,
             )
             assert rc == 0
@@ -606,6 +732,50 @@ class TestVectorsSubcommand:
         finally:
             run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
             run_cli(None, extra_args=["files", "delete", file_id], model=None)
+
+    def test_files_add_by_path(self):
+        """'vectors files add' uploads a file by path and adds it to the vector store."""
+        # Create a vector store
+        stdout, _, rc = run_cli(
+            None, extra_args=["vectors", "create", "test-vs-add-path"], model=None
+        )
+        assert rc == 0
+        vs_id = stdout.strip()
+        assert vs_id.startswith("vs_")
+
+        try:
+            # Add file by path (upload + add)
+            _, _, rc = run_cli(
+                None,
+                extra_args=["vectors", "files", "add", vs_id, "tests/test1.pdf"],
+                model=None,
+                timeout=60,
+            )
+            assert rc == 0
+
+            time.sleep(5)
+            # File must appear in vector store file listing
+            stdout, _, rc = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            assert rc == 0
+            file_ids = [
+                line.split()[0]
+                for line in stdout.splitlines()
+                if line.split() and line.split()[0].startswith("file-")
+            ]
+            assert file_ids, "Expected at least one file in vector store"
+        finally:
+            files, _, _ = run_cli(
+                None, extra_args=["vectors", "files", "list", vs_id], model=None
+            )
+            run_cli(None, extra_args=["vectors", "delete", vs_id], model=None)
+            for fid in (
+                line.split()[0]
+                for line in files.splitlines()
+                if line.split() and line.split()[0].startswith("file-")
+            ):
+                run_cli(None, extra_args=["files", "delete", fid], model=None)
 
 
 class TestConcurrency:

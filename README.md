@@ -1,6 +1,6 @@
-# ChatGPT Python Clients
+# OpenAI API Clients
 
-Python CLI and GUI clients for OpenAI's ChatGPT. Simple, no arguments required to get started.
+Python CLI and GUI clients to interact with OpenAI's API.
 
 ## Installation
 
@@ -22,8 +22,8 @@ pip install openai tkinterweb mistletoe pygments
 
 ### API Key
 
-Expects `.api_key` file in the repo directory with your OpenAI API key. The filename is
-in `.gitignore` already.
+Expects an `OPENAI_API_KEY` environment variable, or a `.api_key` file in the repo
+directory as a fallback. The filename is in `.gitignore` already.
 
 Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`. Override the
 location with the `CHATGPT_GUI_DATA_DIR` environment variable:
@@ -52,10 +52,11 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-i`, `--image` | Image file to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
+| `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search |
+| `-r`, `--rich` | Render Markdown with rich text formatting in the terminal |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
 | `-L`, `--list-all` | List all available models |
-| `-lv`, `--list-vector-stores` | List vector stores |
 
 #### File Management
 
@@ -69,12 +70,16 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 #### Vector Store Management
 
 ```bash
-./cli.py vectors list                                        # list vector stores
-./cli.py vectors create NAME                                 # create a vector store, prints the vector store ID
-./cli.py vectors delete VECTOR_STORE_ID                      # delete a vector store
-./cli.py vectors files list VECTOR_STORE_ID                  # list files in a vector store
-./cli.py vectors files add VECTOR_STORE_ID FILE_ID ...       # add one or more files to a vector store
-./cli.py vectors files delete VECTOR_STORE_ID FILE_ID ...    # remove one or more files from a vector store
+./cli.py vectors list                                           # list vector stores
+./cli.py vectors create NAME                                    # create an empty vector store, prints the vector store ID
+./cli.py vectors create NAME doc1.pdf doc2.pdf                  # create a vector store, upload and index files, prints the ID
+./cli.py vectors create NAME doc.pdf --no-wait                  # same but return immediately without waiting for indexing
+./cli.py vectors delete VECTOR_STORE_ID                         # delete a vector store
+./cli.py vectors purge                                          # delete all vector stores
+./cli.py vectors files list VECTOR_STORE_ID                     # list files in a vector store
+./cli.py vectors files add VECTOR_STORE_ID file1.pdf ...        # upload and add file(s) to a vector store
+./cli.py vectors files add-id VECTOR_STORE_ID FILE_ID ...       # add already-uploaded file(s) to a vector store by ID
+./cli.py vectors files delete VECTOR_STORE_ID FILE_ID ...       # remove one or more files from a vector store
 ```
 
 #### Batch Mode Examples
@@ -87,6 +92,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b -f cv.pdf job.pdf <<< "Is this candidate a good fit?"
 ./cli.py -b -vf contracts/*.pdf <<< "Which contracts mention arbitration?"
 ./cli.py -vf docs/*.pdf  # interactive Q&A session across a document collection
+./cli.py -vs vs_abc123   # interactive Q&A using a pre-existing vector store
 ```
 
 The tool is quite powerful with `guake` drop-down terminal and alias like this:
@@ -124,20 +130,14 @@ highlighting.
 ### Other Tools
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
-- **`dale.py`** — generate images using DALL-E 3
+- **`dale.py`** — generate images using DALL-E 3 (`./dale.py "prompt" [-n N] [-j N]`)
 
 ## Development
 
-To run tests, install `pytest`:
+Install test dependencies:
 
-```
-pip3 install pytest
-```
-
-To run tests in parallel, install also `pytest-xdist` extension:
-
-```
-pip3 install pytest-xdist
+```bash
+pip install pytest pytest-xdist
 ```
 
 Format, lint, and test with:
@@ -145,7 +145,8 @@ Format, lint, and test with:
 ```bash
 make format
 make lint
-make xtest  # Remove x for sequential test
+make test   # sequential
+make xtest  # parallel (16 workers)
 ```
 
 Run a single test suite:

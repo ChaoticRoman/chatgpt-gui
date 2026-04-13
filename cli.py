@@ -110,12 +110,21 @@ def main():
     vectors_create_parser.add_argument(
         "name", metavar="NAME", help="Name for the vector store."
     )
+    vectors_create_parser.add_argument(
+        "files", nargs="*", metavar="FILE", help="File(s) to upload and add."
+    )
+    vectors_create_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
+    )
     vectors_del_parser = vectors_sub.add_parser(
         "delete", help="Delete a vector store by ID."
     )
     vectors_del_parser.add_argument(
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID to delete."
     )
+    vectors_sub.add_parser("purge", help="Delete all vector stores.")
     vectors_files_parser = vectors_sub.add_parser(
         "files", help="Manage files in a vector store."
     )
@@ -129,13 +138,32 @@ def main():
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
     )
     vectors_files_add_parser = vectors_files_sub.add_parser(
-        "add", help="Add file(s) to a vector store."
+        "add", help="Upload file(s) and add to a vector store."
     )
     vectors_files_add_parser.add_argument(
         "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
     )
     vectors_files_add_parser.add_argument(
+        "files", nargs="+", metavar="FILE", help="File path(s) to upload and add."
+    )
+    vectors_files_add_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
+    )
+    vectors_files_add_id_parser = vectors_files_sub.add_parser(
+        "add-id", help="Add already-uploaded file(s) to a vector store by ID."
+    )
+    vectors_files_add_id_parser.add_argument(
+        "id", metavar="VECTOR_STORE_ID", help="Vector store ID."
+    )
+    vectors_files_add_id_parser.add_argument(
         "file_ids", nargs="+", metavar="FILE_ID", help="File ID(s) to add."
+    )
+    vectors_files_add_id_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return immediately without waiting for indexing to complete.",
     )
     vectors_files_del_parser = vectors_files_sub.add_parser(
         "delete", help="Remove file(s) from a vector store."
@@ -192,6 +220,12 @@ def main():
         help="Document(s) to upload to a vector store for semantic file search.",
     )
     parser.add_argument(
+        "-vs",
+        "--vector-store",
+        metavar="ID",
+        help="Use a pre-existing vector store by ID for semantic file search.",
+    )
+    parser.add_argument(
         "-r",
         "--rich",
         action="store_true",
@@ -221,12 +255,6 @@ def main():
         action="store_true",
         help="List all models available.",
     )
-    parser.add_argument(
-        "-lv",
-        "--list-vector-stores",
-        action="store_true",
-        help="List vector stores.",
-    )
     args = parser.parse_args()
 
     if args.command == "files":
@@ -253,10 +281,8 @@ def main():
             for file_id in args.ids:
                 gpt.delete_file(file_id)
         elif args.files_command == "purge":
-            for file_id, name, *_ in gpt.list_files():
-                print(f"Deleting {name} ({file_id})...", end="", flush=True)
+            for file_id, *_ in gpt.list_files():
                 gpt.delete_file(file_id)
-                print(" done.")
         else:
             files_parser.print_help()
         return
@@ -274,9 +300,18 @@ def main():
             ]
             print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         elif args.vectors_command == "create":
-            print(gpt.create_vector_store(args.name))
+            vs_id = gpt.create_vector_store(args.name)
+            for path in args.files:
+                file_id = gpt.upload_file(path, "assistants")
+                gpt.add_vector_store_file(vs_id, file_id)
+            if args.files and not args.no_wait:
+                gpt.wait_for_vector_store(vs_id)
+            print(vs_id)
         elif args.vectors_command == "delete":
             gpt.delete_vector_store(args.id)
+        elif args.vectors_command == "purge":
+            for vsid, *_ in gpt.list_vector_stores():
+                gpt.delete_vector_store(vsid)
         elif args.vectors_command == "files":
             if args.vectors_files_command == "list":
                 files = gpt.list_vector_store_files(args.id)
@@ -288,8 +323,16 @@ def main():
                 ]
                 print_table(("ID", "STATUS", "CREATED_AT"), rows)
             elif args.vectors_files_command == "add":
+                for path in args.files:
+                    file_id = gpt.upload_file(path, "assistants")
+                    gpt.add_vector_store_file(args.id, file_id)
+                if not args.no_wait:
+                    gpt.wait_for_vector_store(args.id)
+            elif args.vectors_files_command == "add-id":
                 for file_id in args.file_ids:
                     gpt.add_vector_store_file(args.id, file_id)
+                if not args.no_wait:
+                    gpt.wait_for_vector_store(args.id)
             elif args.vectors_files_command == "delete":
                 for file_id in args.file_ids:
                     gpt.delete_vector_store_file(args.id, file_id)
@@ -299,7 +342,7 @@ def main():
             vectors_parser.print_help()
         return
 
-    list_opts = [args.list_known, args.list_all, args.list_vector_stores]
+    list_opts = [args.list_known, args.list_all]
     if (
         any(list_opts)
         and (
@@ -310,37 +353,32 @@ def main():
             or args.image
             or args.file
             or args.vectorize_file
+            or args.vector_store
             or args.rich
             or args.web_search
             or args.debug
         )
     ) or sum(list_opts) > 1:
         parser.error(
-            "-l/--list-known, -L/--list-all, and -lv/--list-vector-stores "
+            "-l/--list-known and -L/--list-all "
             "cannot be combined with each other or other options."
         )
 
+    if args.vectorize_file and args.vector_store:
+        parser.error("--vectorize-file and --vector-store cannot be used together.")
+
     if args.list_known:
-        [print(m) for m in sorted(core.USD_PER_INPUT_TOKEN.keys())]
+        known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
+        for m in known_models:
+            print(m)
         return
 
     core.load_key()
 
     if args.list_all:
-        [print(m) for m in core.GptCore(None, None, None).list_models()]
-        return
-
-    if args.list_vector_stores:
-        stores = core.GptCore(None, None, None).list_vector_stores()
-        if not stores:
-            print("No vector stores.")
-            return
-
-        rows = [
-            (vsid, name, status, fmt_ts(created_at))
-            for vsid, name, status, created_at in stores
-        ]
-        print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
+        all_models = core.GptCore(None, None, None).list_models()
+        for m in all_models:
+            print(m)
         return
 
     if args.batch_mode:
@@ -367,6 +405,7 @@ def main():
             image_path=args.image,
             file_paths=args.file,
             vectorize_file_paths=args.vectorize_file,
+            vector_store_id=args.vector_store,
         )
         return
 
@@ -408,6 +447,7 @@ def main():
         image_path=args.image,
         file_paths=args.file,
         vectorize_file_paths=args.vectorize_file,
+        vector_store_id=args.vector_store,
     )
 
 

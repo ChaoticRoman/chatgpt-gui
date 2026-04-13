@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import json
+import queue
 import threading
 import tkinter as tk
 from tkinter import (
@@ -59,13 +60,19 @@ class JsonViewerApp(tk.Tk):
         self.input_frame = tk.Frame(self.vpaned)
         self.vpaned.add(self.input_frame, minsize=60)
 
-        self.input_text = Text(self.input_frame, height=3)
+        self.input_row = tk.Frame(self.input_frame)
+        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
+
+        self.input_text = Text(self.input_row, height=3)
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
 
         self.send_button = Button(
-            self.input_frame, text="Send", command=self.send_message
+            self.input_row, text="Send", command=self.send_message
         )
         self.send_button.pack(side=RIGHT)
+
+        # Progress bar shown while waiting for a response; hidden at rest
+        self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
 
         # Bind Enter key to send message (Shift+Enter for newline)
         self.input_text.bind("<Return>", self.on_enter)
@@ -73,6 +80,8 @@ class JsonViewerApp(tk.Tk):
         # Core and conversation state
         self.current_file_path = None
         self.gpt_core = None
+        self._input_queue = queue.Queue()
+        self._gpt_thread = None
 
         # Load the list of JSON files
         self.load_json_files()
@@ -87,6 +96,12 @@ class JsonViewerApp(tk.Tk):
 
         # Killing with CTRL+C in the console
         self.check()
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
+        self._stop_gpt_thread()
+        self.destroy()
 
     def load_json_files(self):
         """Load the list of JSON files from the hardcoded folder."""
@@ -117,6 +132,9 @@ class JsonViewerApp(tk.Tk):
             file_path = os.path.join(DATA_DIRECTORY, selected_file)
             self.current_file_path = file_path
 
+            # Reset UI in case we switched while waiting for a response
+            self._set_ui_idle()
+
             with open(file_path, "r") as file:
                 file_content = json.load(file)
                 self.display_conversation(file_content)
@@ -130,23 +148,64 @@ class JsonViewerApp(tk.Tk):
         self.file_content_text.load_html(formatted_content)
 
     def initialize_gpt_core(self, existing_messages, file_path):
-        """Initialize GptCore with existing conversation."""
+        """Start a GptCore.main() loop for this conversation in a background thread.
+
+        The main loop blocks on a queue.Queue for input and calls back into the
+        GUI via after(0, ...) for output, keeping the GUI responsive at all times.
+        Closures capture the specific queue and core instance so that stale
+        responses from a previous conversation are silently ignored.
+        """
+        self._stop_gpt_thread()
+        input_queue = queue.Queue()
+        self._input_queue = input_queue
+
         load_key()
-        # Extract model from the conversation or use default
-        model = DEFAULT_MODEL  # Default model
 
-        # Create GptCore instance
-        self.gpt_core = GptCore(
-            input=None,
-            output=None,
-            model=model,
+        def gui_input():
+            # Blocks until send_message() puts a prompt (or None) in the queue.
+            return input_queue.get()
+
+        def gui_output(content, info):
+            # Called from the background thread; schedule GUI update on main thread.
+            def update():
+                # Guard: ignore if the user has already switched to another conversation.
+                if self.gpt_core is core:
+                    self.display_conversation(core.messages)
+                    self._set_ui_idle()
+                    self.input_text.focus()
+
+            self.after(0, update)
+
+        core = GptCore(
+            input=gui_input,
+            output=gui_output,
+            model=DEFAULT_MODEL,
         )
-
-        # Load existing messages into GptCore
-        self.gpt_core.messages = [
+        self.gpt_core = core
+        core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
-        self.gpt_core.file = file_path
+        core.file = file_path
+
+        self._gpt_thread = threading.Thread(target=core.main, daemon=True)
+        self._gpt_thread.start()
+
+    def _stop_gpt_thread(self):
+        """Send a termination signal to the running GptCore main loop."""
+        if self._gpt_thread and self._gpt_thread.is_alive():
+            self._input_queue.put(None)
+
+    def _set_ui_busy(self):
+        self.send_button.config(state="disabled")
+        self.input_text.config(state="disabled")
+        self.progress_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.progress_bar.start(10)
+
+    def _set_ui_idle(self):
+        self.progress_bar.stop()
+        self.progress_bar.pack_forget()
+        self.send_button.config(state="normal")
+        self.input_text.config(state="normal")
 
     def on_enter(self, event):
         """Handle Enter key press."""
@@ -156,11 +215,10 @@ class JsonViewerApp(tk.Tk):
             return "break"  # Prevent default newline behavior
 
     def send_message(self):
-        """Send user message and get AI response."""
+        """Hand the user's message to the waiting GptCore main loop."""
         if not self.gpt_core:
             return
 
-        # Get user input
         user_message = self.input_text.get("1.0", "end-1c").strip()
         if not user_message:
             return
@@ -169,30 +227,11 @@ class JsonViewerApp(tk.Tk):
             self.gpt_core.messages + [{"role": "user", "content": user_message}]
         )
 
-        # Clear input field
         self.input_text.delete("1.0", END)
+        self._set_ui_busy()
 
-        # Disable input while processing
-        self.send_button.config(state="disabled")
-        self.input_text.config(state="disabled")
-
-        threading.Thread(
-            target=self.get_ai_response, args=(user_message,), daemon=True
-        ).start()
-
-    def get_ai_response(self, user_message):
-        """Get AI response (runs in separate thread)."""
-        try:
-            self.gpt_core.send(user_message)
-
-            # Update display with new message
-            self.after(0, lambda: self.display_conversation(self.gpt_core.messages))
-
-        finally:
-            # Re-enable input
-            self.after(0, lambda: self.send_button.config(state="normal"))
-            self.after(0, lambda: self.input_text.config(state="normal"))
-            self.after(0, lambda: self.input_text.focus())
+        # Unblock the gui_input() callback in the background thread
+        self._input_queue.put(user_message)
 
     # context switch to allow code to check CTRL+C in console
     def check(self):

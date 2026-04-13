@@ -61,17 +61,23 @@ class JsonViewerApp(tk.Tk):
         self.hpaned = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashwidth=5)
         self.hpaned.pack(fill=BOTH, expand=True)
 
-        # Left: new conversation button + file table with scrollbar
+        # Left: file table with scrollbar + buttons below
         self.left_frame = tk.Frame(self.hpaned)
+        self.table_frame = tk.Frame(self.left_frame)
+        self.table_frame.pack(side=tk.TOP, fill=BOTH, expand=True)
+        self.del_conv_button = Button(
+            self.left_frame,
+            text="Delete Conversation",
+            command=self.delete_conversation,
+        )
+        self.del_conv_button.pack(side=tk.BOTTOM, fill=tk.X)
         self.new_conv_button = Button(
             self.left_frame,
             text="New Conversation",
             command=self.new_conversation,
             font=("TkDefaultFont", 10, "bold"),
         )
-        self.new_conv_button.pack(side=tk.TOP, fill=tk.X)
-        self.table_frame = tk.Frame(self.left_frame)
-        self.table_frame.pack(side=tk.TOP, fill=BOTH, expand=True)
+        self.new_conv_button.pack(side=tk.BOTTOM, fill=tk.X)
         self.file_table = ttk.Treeview(
             self.table_frame,
             columns=("file",),
@@ -311,6 +317,46 @@ class JsonViewerApp(tk.Tk):
         self.file_table.insert("", pos, values=(file_name,), tags=("unsaved",))
         self._select_file_in_list(file_name)
         self.display_conversation([])
+
+    def delete_conversation(self):
+        """Delete the selected conversation: remove from disk, list, and internal state."""
+        selection = self.file_table.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        children = self.file_table.get_children()
+        idx = list(children).index(item)
+        next_item = (
+            children[idx + 1]
+            if idx + 1 < len(children)
+            else (children[idx - 1] if idx > 0 else None)
+        )
+
+        file_name = self.file_table.item(item)["values"][0]
+        file_path = os.path.join(DATA_DIRECTORY, file_name)
+        key = str(file_path)
+
+        # Shut down the core for this conversation if one exists
+        if key in self._cores:
+            self._cores.pop(key)._input_queue.put(None)
+        self._busy_paths.discard(key)
+        self._drafts.pop(key, None)
+
+        # Clear active conversation reference so _save_draft is a no-op
+        if self.gpt_core and str(self.gpt_core.file) == key:
+            self.gpt_core = None
+            self.current_file_path = None
+
+        # Remove physical file and list row
+        Path(file_path).unlink(missing_ok=True)
+        self.file_table.delete(item)
+
+        if next_item:
+            self.file_table.selection_set(next_item)
+        else:
+            self.display_conversation([])
+            self.new_conversation()
 
     def _launch_core(self, core):
         """Wire up GUI callbacks to a GptCore instance and start its main loop thread.

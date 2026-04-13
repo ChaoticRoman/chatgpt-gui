@@ -14,6 +14,7 @@ from tkinter import (
     BOTH,
     Text,
     Button,
+    filedialog,
 )
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -22,7 +23,14 @@ from tkinterweb import HtmlFrame
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
-from core import DEFAULT_MODEL, DATA_DIRECTORY, GptCore, load_key
+from core import (
+    DEFAULT_MODEL,
+    DATA_DIRECTORY,
+    GptCore,
+    IMAGE_EXTENSIONS,
+    USER_DATA_EXTENSIONS,
+    load_key,
+)
 
 
 class JsonViewerApp(tk.Tk):
@@ -92,25 +100,58 @@ class JsonViewerApp(tk.Tk):
         self.input_frame = tk.Frame(self.vpaned)
         self.vpaned.add(self.input_frame, minsize=60)
 
-        self.input_row = tk.Frame(self.input_frame)
-        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
+        # Attachments section: list → buttons → web search (all above the input text)
+        self.attachments_section = tk.Frame(self.input_frame)
+        self.attachments_section.pack(side=tk.TOP, fill=tk.X)
 
-        self.button_col = tk.Frame(self.input_row)
-        self.button_col.pack(side=RIGHT, fill=tk.Y)
+        att_list_frame = tk.Frame(self.attachments_section)
+        att_list_frame.pack(side=tk.TOP, fill=tk.BOTH)
+
+        self.att_tree = ttk.Treeview(
+            att_list_frame,
+            columns=("file", "purpose"),
+            show="headings",
+            selectmode="extended",
+            height=3,
+        )
+        self.att_tree.heading("file", text="File")
+        self.att_tree.heading("purpose", text="Purpose")
+        self.att_tree.column("purpose", width=90, stretch=False)
+        self.att_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        att_sb = Scrollbar(att_list_frame, command=self.att_tree.yview)
+        att_sb.pack(side=RIGHT, fill=Y)
+        self.att_tree.config(yscrollcommand=att_sb.set)
+        self.att_tree.bind("<Button-3>", self.on_att_right_click)
+        self._attachment_data = {}  # iid -> (full_path, purpose)
+
+        att_buttons = tk.Frame(self.attachments_section)
+        att_buttons.pack(side=tk.TOP, fill=tk.X)
+        Button(att_buttons, text="Add attachment", command=self.add_attachment).pack(
+            side=LEFT
+        )
+        Button(
+            att_buttons, text="Add for vectorization", command=self.add_vectorization
+        ).pack(side=LEFT)
+        Button(att_buttons, text="Clear", command=self.clear_attachments).pack(
+            side=LEFT
+        )
 
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
-            self.button_col, text="Web search", variable=self.web_search_var
+            self.attachments_section, text="Web search", variable=self.web_search_var
         )
-        self.web_search_check.pack(side=tk.TOP)
+        self.web_search_check.pack(side=tk.TOP, anchor="w")
 
-        self.send_button = Button(
-            self.button_col, text="Send", command=self.send_message
-        )
-        self.send_button.pack(side=tk.BOTTOM, fill=tk.X)
+        self.input_row = tk.Frame(self.input_frame)
+        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
 
         self.input_text = Text(self.input_row, height=3)
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
+
+        self.send_button = Button(
+            self.input_row, text="Send", command=self.send_message
+        )
+        self.send_button.pack(side=RIGHT, fill=tk.Y)
 
         # Progress bar shown while waiting for a response; hidden at rest
         self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
@@ -220,6 +261,7 @@ class JsonViewerApp(tk.Tk):
             return
 
         self._save_draft()
+        self._clear_attachment_list()
         self.current_file_path = file_path
 
         if os.path.exists(file_path):
@@ -303,7 +345,10 @@ class JsonViewerApp(tk.Tk):
                     self.after(100, lambda: self.file_content_text.yview_moveto(1.0))
                     self._select_file_in_list(Path(core.file).name)
 
-            self.after(0, update)
+            try:
+                self.after(0, update)
+            except tk.TclError:
+                pass  # window was destroyed before the response arrived
 
         def on_save():
             # Called from the background thread after every _save(); schedule a
@@ -314,11 +359,12 @@ class JsonViewerApp(tk.Tk):
         core.output = gui_output
         core.save_callback = on_save
 
-        core._thread = threading.Thread(target=core.main, daemon=True)
+        core._thread = threading.Thread(target=core.main)
         core._thread.start()
 
     def _set_ui_busy(self):
         self._sash_pos = self.vpaned.sash_coord(0)
+        self.attachments_section.pack_forget()
         self.input_row.pack_forget()
         self.progress_bar.pack(fill=tk.X, expand=True)
         self.progress_bar.start(10)
@@ -332,6 +378,7 @@ class JsonViewerApp(tk.Tk):
     def _set_ui_idle(self):
         self.progress_bar.stop()
         self.progress_bar.pack_forget()
+        self.attachments_section.pack(side=tk.TOP, fill=tk.X)
         self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
         self.vpaned.paneconfigure(self.input_frame, minsize=60)
         if self._sash_pos is not None:
@@ -354,6 +401,22 @@ class JsonViewerApp(tk.Tk):
         if not user_message:
             return
 
+        # Populate the core's attachment slots before unblocking input().
+        # The background thread is blocked on queue.get() so writes are safe.
+        image_path, file_paths, vectorize_paths = None, [], []
+        for iid in self.att_tree.get_children():
+            path, purpose = self._attachment_data[iid]
+            if purpose == "vision":
+                image_path = path
+            elif purpose == "user_data":
+                file_paths.append(path)
+            elif purpose == "assistants":
+                vectorize_paths.append(path)
+        self._clear_attachment_list()
+        self.gpt_core._next_image_path = image_path
+        self.gpt_core._next_file_paths = file_paths or None
+        self.gpt_core._next_vectorize_paths = vectorize_paths or None
+
         self.display_conversation(
             self.gpt_core.messages + [{"role": "user", "content": user_message}]
         )
@@ -365,6 +428,66 @@ class JsonViewerApp(tk.Tk):
 
         # Unblock the gui_input() callback in the background thread
         self.gpt_core._input_queue.put(user_message)
+
+    def add_attachment(self):
+        paths = filedialog.askopenfilenames(
+            title="Add attachment",
+            filetypes=[
+                (
+                    "All supported",
+                    " ".join(f"*{e}" for e in IMAGE_EXTENSIONS + USER_DATA_EXTENSIONS),
+                ),
+                ("Images", " ".join(f"*{e}" for e in IMAGE_EXTENSIONS)),
+                ("Documents", " ".join(f"*{e}" for e in USER_DATA_EXTENSIONS)),
+            ],
+        )
+        for path in paths:
+            ext = Path(path).suffix.lower()
+            if ext in IMAGE_EXTENSIONS:
+                # Only one vision file allowed — replace any existing one
+                for iid in list(self.att_tree.get_children()):
+                    if self._attachment_data[iid][1] == "vision":
+                        del self._attachment_data[iid]
+                        self.att_tree.delete(iid)
+                self._insert_attachment(path, "vision")
+            elif ext in USER_DATA_EXTENSIONS:
+                self._insert_attachment(path, "user_data")
+
+    def add_vectorization(self):
+        paths = filedialog.askopenfilenames(
+            title="Add for vectorization",
+            filetypes=[
+                ("Documents", " ".join(f"*{e}" for e in USER_DATA_EXTENSIONS)),
+            ],
+        )
+        for path in paths:
+            self._insert_attachment(path, "assistants")
+
+    def _insert_attachment(self, path, purpose):
+        iid = self.att_tree.insert("", END, values=(Path(path).name, purpose))
+        self._attachment_data[iid] = (path, purpose)
+
+    def clear_attachments(self):
+        self._clear_attachment_list()
+
+    def _clear_attachment_list(self):
+        for iid in list(self.att_tree.get_children()):
+            self.att_tree.delete(iid)
+        self._attachment_data.clear()
+
+    def remove_selected_attachments(self):
+        for iid in list(self.att_tree.selection()):
+            del self._attachment_data[iid]
+            self.att_tree.delete(iid)
+
+    def on_att_right_click(self, event):
+        iid = self.att_tree.identify_row(event.y)
+        if iid and iid not in self.att_tree.selection():
+            self.att_tree.selection_set(iid)
+        if self.att_tree.selection():
+            menu = tk.Menu(self, tearoff=0)
+            menu.add_command(label="Remove", command=self.remove_selected_attachments)
+            menu.post(event.x_root, event.y_root)
 
     def _refresh_list_if_new(self, core):
         """On first save of a new conversation, clear the gray 'unsaved' tag."""

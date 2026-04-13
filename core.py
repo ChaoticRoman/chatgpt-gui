@@ -13,6 +13,25 @@ import openai
 # Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
 DEFAULT_MODEL = "gpt-5.4"
 
+IMAGE_EXTENSIONS = (".png", ".jpg", ".webp", ".gif")
+USER_DATA_EXTENSIONS = (
+    ".csv",
+    ".doc",
+    ".docx",
+    ".html",
+    ".json",
+    ".md",
+    ".odt",
+    ".pdf",
+    ".ppt",
+    ".pptx",
+    ".rtf",
+    ".txt",
+    ".xls",
+    ".xlsx",
+    ".xml",
+)
+
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = {
     "o1": 15e-6,
@@ -247,6 +266,29 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
+    def _init_session(
+        self, image_path, file_paths, vectorize_file_paths, vector_store_id
+    ):
+        """Reset per-session state and populate the attachment slots."""
+        self._images = []
+        self._files = []
+        self._vector_store_id = vector_store_id or None
+        self._vector_store_owned = False
+        self._vector_files = []
+        self._next_image_path = image_path
+        self._next_file_paths = file_paths
+        self._next_vectorize_paths = vectorize_file_paths
+
+    def _consume_attachments(self):
+        """Set up any pending vector store, then return and clear the per-message slots."""
+        if self._next_vectorize_paths and not self._vector_store_id:
+            self._setup_vector_store(self._next_vectorize_paths)
+            self._next_vectorize_paths = None
+        image_path, file_paths = self._next_image_path, self._next_file_paths
+        self._next_image_path = None
+        self._next_file_paths = None
+        return image_path, file_paths
+
     def main(
         self,
         image_path=None,
@@ -254,24 +296,15 @@ class GptCore:
         vectorize_file_paths=None,
         vector_store_id=None,
     ):
-        self._images = []
-        self._files = []
-        self._vector_store_id = None
-        self._vector_store_owned = False
-        self._vector_files = []
+        self._init_session(
+            image_path, file_paths, vectorize_file_paths, vector_store_id
+        )
         price = 0.0
         total_web_search_calls = 0
         try:
-            if vector_store_id:
-                self._vector_store_id = vector_store_id
-            elif vectorize_file_paths:
-                self._setup_vector_store(vectorize_file_paths)
             while prompt := self.input():
-                content, info = self.send(
-                    prompt, image_path=image_path, file_paths=file_paths
-                )
-                image_path = None  # only attach files to the first message
-                file_paths = None
+                img, fps = self._consume_attachments()
+                content, info = self.send(prompt, image_path=img, file_paths=fps)
                 if price is not None and info.price is not None:
                     price += info.price
                 else:
@@ -296,22 +329,15 @@ class GptCore:
         vectorize_file_paths=None,
         vector_store_id=None,
     ):
-        self._images = []
-        self._files = []
-        self._vector_store_id = None
-        self._vector_store_owned = False
-        self._vector_files = []
+        self._init_session(
+            image_path, file_paths, vectorize_file_paths, vector_store_id
+        )
         prompt = self.input()
         if not prompt:
             return
         try:
-            if vector_store_id:
-                self._vector_store_id = vector_store_id
-            elif vectorize_file_paths:
-                self._setup_vector_store(vectorize_file_paths)
-            content, info = self.send(
-                prompt, image_path=image_path, file_paths=file_paths
-            )
+            img, fps = self._consume_attachments()
+            content, info = self.send(prompt, image_path=img, file_paths=fps)
             self.output(content, info)
         finally:
             self._teardown()

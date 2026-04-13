@@ -100,12 +100,18 @@ class JsonViewerApp(tk.Tk):
         self.input_frame = tk.Frame(self.vpaned)
         self.vpaned.add(self.input_frame, minsize=60)
 
-        # Attachments section: list → buttons → web search (all above the input text)
-        self.attachments_section = tk.Frame(self.input_frame)
-        self.attachments_section.pack(side=tk.TOP, fill=tk.X)
+        self.input_row = tk.Frame(self.input_frame)
+        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
 
-        att_list_frame = tk.Frame(self.attachments_section)
-        att_list_frame.pack(side=tk.TOP, fill=tk.BOTH)
+        self.input_text = Text(self.input_row, height=3)
+        self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
+
+        # Right panel: attachment list → buttons → web search → send
+        right_panel = tk.Frame(self.input_row)
+        right_panel.pack(side=RIGHT, fill=tk.Y)
+
+        att_list_frame = tk.Frame(right_panel)
+        att_list_frame.pack(side=tk.TOP, fill=BOTH, expand=True)
 
         self.att_tree = ttk.Treeview(
             att_list_frame,
@@ -124,34 +130,24 @@ class JsonViewerApp(tk.Tk):
         self.att_tree.bind("<Button-3>", self.on_att_right_click)
         self._attachment_data = {}  # iid -> (full_path, purpose)
 
-        att_buttons = tk.Frame(self.attachments_section)
-        att_buttons.pack(side=tk.TOP, fill=tk.X)
-        Button(att_buttons, text="Add attachment", command=self.add_attachment).pack(
-            side=LEFT
+        Button(right_panel, text="Add attachment", command=self.add_attachment).pack(
+            side=tk.TOP, fill=tk.X
         )
         Button(
-            att_buttons, text="Add for vectorization", command=self.add_vectorization
-        ).pack(side=LEFT)
-        Button(att_buttons, text="Clear", command=self.clear_attachments).pack(
-            side=LEFT
+            right_panel, text="Add for vectorization", command=self.add_vectorization
+        ).pack(side=tk.TOP, fill=tk.X)
+        Button(right_panel, text="Clear", command=self.clear_attachments).pack(
+            side=tk.TOP, fill=tk.X
         )
 
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
-            self.attachments_section, text="Web search", variable=self.web_search_var
+            right_panel, text="Web search", variable=self.web_search_var
         )
         self.web_search_check.pack(side=tk.TOP, anchor="w")
 
-        self.input_row = tk.Frame(self.input_frame)
-        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
-
-        self.input_text = Text(self.input_row, height=3)
-        self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
-
-        self.send_button = Button(
-            self.input_row, text="Send", command=self.send_message
-        )
-        self.send_button.pack(side=RIGHT, fill=tk.Y)
+        self.send_button = Button(right_panel, text="Send", command=self.send_message)
+        self.send_button.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Progress bar shown while waiting for a response; hidden at rest
         self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
@@ -364,7 +360,6 @@ class JsonViewerApp(tk.Tk):
 
     def _set_ui_busy(self):
         self._sash_pos = self.vpaned.sash_coord(0)
-        self.attachments_section.pack_forget()
         self.input_row.pack_forget()
         self.progress_bar.pack(fill=tk.X, expand=True)
         self.progress_bar.start(10)
@@ -378,7 +373,6 @@ class JsonViewerApp(tk.Tk):
     def _set_ui_idle(self):
         self.progress_bar.stop()
         self.progress_bar.pack_forget()
-        self.attachments_section.pack(side=tk.TOP, fill=tk.X)
         self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
         self.vpaned.paneconfigure(self.input_frame, minsize=60)
         if self._sash_pos is not None:

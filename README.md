@@ -48,7 +48,8 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection |
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
-| `-p`, `--prepend` | Prepend a file's contents to the first message |
+| `-p`, `--prepend` | Prepend a string (followed by two newlines) to the first message |
+| `-pf`, `--prepend-file` | Prepend a file's contents to the first message |
 | `-i`, `--image` | Image file to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
@@ -87,7 +88,8 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ```bash
 ./cli.py -b <<< "Tell a joke" > joke.txt
 ./cli.py -b < prompt.txt > output.txt
-./cli.py -b --prepend summarize_prompt.txt < article.txt
+./cli.py -b --prepend-file summarize_prompt.txt < article.txt
+./cli.py -b -p "Summarize the following text:" < article.txt
 ./cli.py -b -f report.pdf <<< "Summarize this document"
 ./cli.py -b -f cv.pdf job.pdf <<< "Is this candidate a good fit?"
 ./cli.py -b -vf contracts/*.pdf <<< "Which contracts mention arbitration?"
@@ -105,7 +107,7 @@ More useful example to review patch of PR for currently checked out branch in th
 directory (expects `gh` client installed):
 
 ```bash
-alias review='gh pr diff --patch | gpt -b -p $HOME/.pr-review'
+alias review='gh pr diff --patch | gpt -b -pf $HOME/.pr-review'
 ```
 
 The `.pr-review` file contains:

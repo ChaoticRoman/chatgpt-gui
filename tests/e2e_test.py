@@ -175,7 +175,7 @@ class TestBatchMode:
 
 
 class TestPrepend:
-    """Test the --prepend flag that prepends file content to the first message."""
+    """Test the --prepend and --prepend-file flags."""
 
     def test_prepend_adds_context(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -185,12 +185,21 @@ class TestPrepend:
                 stdin_text = "What is the password? Reply with just the word.\n"
                 stdout, stderr, rc = run_cli(
                     stdin_text,
-                    extra_args=["-b", "-p", f.name],
+                    extra_args=["-b", "-pf", f.name],
                 )
                 assert rc == 0
                 assert get_responses(stdout)[0] == "swordfish"
             finally:
                 os.unlink(f.name)
+
+    def test_prepend_string_adds_context(self):
+        stdin_text = "What is my name? Reply with just the name.\n"
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-b", "-p", "My name is Gandalf."],
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0] == "gandalf"
 
     def test_prepend_only_first_turn(self):
         """Prepend should only apply to the first message."""
@@ -205,7 +214,7 @@ class TestPrepend:
                 )
                 stdout, stderr, rc = run_cli(
                     stdin_text,
-                    extra_args=["-p", f.name],
+                    extra_args=["-pf", f.name],
                 )
                 assert rc == 0
                 responses = get_responses(stdout)

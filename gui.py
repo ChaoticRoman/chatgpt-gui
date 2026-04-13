@@ -433,6 +433,7 @@ class JsonViewerApp(tk.Tk):
                 ),
                 ("Images", " ".join(f"*{e}" for e in IMAGE_EXTENSIONS)),
                 ("Documents", " ".join(f"*{e}" for e in USER_DATA_EXTENSIONS)),
+                ("All files", "*.*"),
             ],
         )
         for path in paths:
@@ -444,7 +445,7 @@ class JsonViewerApp(tk.Tk):
                         del self._attachment_data[iid]
                         self.att_tree.delete(iid)
                 self._insert_attachment(path, "vision")
-            elif ext in USER_DATA_EXTENSIONS:
+            else:
                 self._insert_attachment(path, "user_data")
 
     def add_vectorization(self):

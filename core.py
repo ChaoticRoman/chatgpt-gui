@@ -10,10 +10,9 @@ from pprint import pprint
 
 import openai
 
-# Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
 DEFAULT_MODEL = "gpt-5.4"
 
-IMAGE_EXTENSIONS = (".png", ".jpg", ".webp", ".gif")
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 USER_DATA_EXTENSIONS = (
     ".csv",
     ".doc",
@@ -43,6 +42,8 @@ USD_PER_INPUT_TOKEN = {
     "gpt-5.2": 1.75e-6,
     "gpt-5.2-codex": 1.75e-6,
     "gpt-5.3-codex": 1.75e-6,
+    "gpt-5.4-nano": 0.2e-6,
+    "gpt-5.4-mini": 0.75e-6,
     "gpt-5.4": 2.5e-6,
     "gpt-5.4-pro": 30e-6,
 }
@@ -56,6 +57,8 @@ USD_PER_OUTPUT_TOKEN = {
     "gpt-5.2": 14e-6,
     "gpt-5.2-codex": 14e-6,
     "gpt-5.3-codex": 14e-6,
+    "gpt-5.4-nano": 1.25e-6,
+    "gpt-5.4-mini": 4.5e-6,
     "gpt-5.4": 15e-6,
     "gpt-5.4-pro": 180e-6,
 }

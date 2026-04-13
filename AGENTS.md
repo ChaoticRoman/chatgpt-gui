@@ -66,6 +66,10 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 
 You may be running in a git worktree (e.g. `.claude/worktrees/...`). Your cwd is already set correctly — run `git`, `gh`, and other commands directly without `-C` or `cd`.
 
+## Code style
+
+- **DRY** — don't repeat yourself. Extract helpers rather than duplicating logic.
+
 ## Things to avoid
 
 - Don't add type stubs, docstrings, or comments to code you didn't change.

@@ -114,6 +114,8 @@ class GptCore:
         os.makedirs(DATA_DIRECTORY, exist_ok=True)
         self.file = DATA_DIRECTORY / f"{self.conversation_id}.json"
 
+        self.save_callback = None
+
         self.client = openai.OpenAI()
 
     def _compute_price(self, input_tokens, output_tokens, web_search_calls=0):
@@ -179,6 +181,12 @@ class GptCore:
             self.delete_file(file_id)
         self._teardown_vector_store()
 
+    def _save(self):
+        with open(self.file, "w") as f:
+            json.dump([dict(m) for m in self.messages], f, sort_keys=True, indent=4)
+        if self.save_callback:
+            self.save_callback()
+
     def send(self, prompt, image_path=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
         content = []
@@ -194,6 +202,7 @@ class GptCore:
             content.append({"type": "input_file", "file_id": file_id})
         content.append({"type": "input_text", "text": prompt})
         self.messages.append({"role": "user", "content": content})
+        self._save()
 
         tools = []
         includes = []
@@ -225,9 +234,7 @@ class GptCore:
                 content += "\n\n**Sources:**\n" + "\n".join(
                     f"- [{s['title']}]({s['url']})" for s in sources
                 )
-        serialized = [dict(m) for m in self.messages]
-        with open(self.file, "w") as f:
-            json.dump(serialized, f, sort_keys=True, indent=4)
+        self._save()
 
         usage = response.usage
         input_tokens, output_tokens = usage.input_tokens, usage.output_tokens

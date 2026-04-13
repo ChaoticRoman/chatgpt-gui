@@ -95,13 +95,22 @@ class JsonViewerApp(tk.Tk):
         self.input_row = tk.Frame(self.input_frame)
         self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
 
-        self.input_text = Text(self.input_row, height=3)
-        self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
+        self.button_col = tk.Frame(self.input_row)
+        self.button_col.pack(side=RIGHT, fill=tk.Y)
+
+        self.web_search_var = tk.BooleanVar(value=False)
+        self.web_search_check = tk.Checkbutton(
+            self.button_col, text="Web search", variable=self.web_search_var
+        )
+        self.web_search_check.pack(side=tk.TOP)
 
         self.send_button = Button(
-            self.input_row, text="Send", command=self.send_message
+            self.button_col, text="Send", command=self.send_message
         )
-        self.send_button.pack(side=RIGHT)
+        self.send_button.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.input_text = Text(self.input_row, height=3)
+        self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
 
         # Progress bar shown while waiting for a response; hidden at rest
         self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
@@ -350,6 +359,7 @@ class JsonViewerApp(tk.Tk):
         )
 
         self.input_text.delete("1.0", END)
+        self.gpt_core.web_search = self.web_search_var.get()
         self._busy_paths.add(str(self.gpt_core.file))
         self._set_ui_busy()
 

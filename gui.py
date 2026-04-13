@@ -36,6 +36,20 @@ class JsonViewerApp(tk.Tk):
         ttk.Style().configure("File.Treeview", font="TkFixedFont")
 
         # Horizontal paned window: file list | conversation
+        # Status bar at the very bottom showing last response info
+        self.status_bar = tk.Label(
+            self,
+            text="",
+            anchor="w",
+            justify="left",
+            font=tkfont.nametofont("TkFixedFont"),
+            relief="sunken",
+            bd=1,
+            padx=4,
+            pady=2,
+        )
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
         self.hpaned = tk.PanedWindow(self, orient=tk.HORIZONTAL, sashwidth=5)
         self.hpaned.pack(fill=BOTH, expand=True)
 
@@ -270,6 +284,7 @@ class JsonViewerApp(tk.Tk):
             # Called from the background thread; schedule GUI update on main thread.
             def update():
                 self._busy_paths.discard(str(core.file))
+                self.status_bar.config(text=repr(info))
                 # Guard: skip display/UI updates if the user switched away.
                 if self.gpt_core is core:
                     self.display_conversation(core.messages)

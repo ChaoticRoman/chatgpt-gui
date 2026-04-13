@@ -119,7 +119,7 @@ class TestMultiturn:
     def test_context_carries_over(self):
         """Ask the model to remember a secret word, then ask for it back."""
         stdin_text = (
-            "Our word is 'banana'. Acknowledged?\n"
+            "Our word is 'banana'. Say OK.\n"
             "What is our word? Reply with just the word.\n"
             "q\n"
         )
@@ -142,7 +142,7 @@ class TestMultiturn:
     def test_name_recall(self):
         """Tell the model a name and ask it back in the next turn."""
         stdin_text = (
-            "My name is Zephyrine. Just say hello.\n"
+            "My name is Zephyrine. Say OK.\n"
             "What is my name? Reply with just the name.\n"
             "q\n"
         )
@@ -175,7 +175,7 @@ class TestBatchMode:
 
 
 class TestPrepend:
-    """Test the --prepend flag that prepends file content to the first message."""
+    """Test the --prepend and --prepend-file flags."""
 
     def test_prepend_adds_context(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -185,17 +185,26 @@ class TestPrepend:
                 stdin_text = "What is the password? Reply with just the word.\n"
                 stdout, stderr, rc = run_cli(
                     stdin_text,
-                    extra_args=["-b", "-p", f.name],
+                    extra_args=["-b", "-pf", f.name],
                 )
                 assert rc == 0
                 assert get_responses(stdout)[0] == "swordfish"
             finally:
                 os.unlink(f.name)
 
+    def test_prepend_string_adds_context(self):
+        stdin_text = "What is my name? Reply with just the name.\n"
+        stdout, stderr, rc = run_cli(
+            stdin_text,
+            extra_args=["-b", "-p", "My name is Gandalf."],
+        )
+        assert rc == 0
+        assert get_responses(stdout)[0] == "gandalf"
+
     def test_prepend_only_first_turn(self):
         """Prepend should only apply to the first message."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write("CONTEXT: The color is red. I am mentioning Peter as well.")
+            f.write("Color: red. Hello Peter.")
             f.flush()
             try:
                 stdin_text = (
@@ -205,7 +214,7 @@ class TestPrepend:
                 )
                 stdout, stderr, rc = run_cli(
                     stdin_text,
-                    extra_args=["-p", f.name],
+                    extra_args=["-pf", f.name],
                 )
                 assert rc == 0
                 responses = get_responses(stdout)
@@ -227,7 +236,7 @@ class TestMultilineInput:
 
     def test_multiline_preserves_newlines(self):
         """Multiline input should preserve newlines in the prompt."""
-        stdin_text = "Just making line.\n\nAnd another.\n\nCount non-empty lines in this prompt. Reply with just the count.\nSEND\nq\n"
+        stdin_text = "One.\n\nTwo.\n\nCount non-empty lines above. Reply just the count.\nSEND\nq\n"
         stdout, stderr, rc = run_cli(stdin_text, extra_args=["-m"])
         assert rc == 0
         assert int(get_responses(stdout)[0]) > 1
@@ -292,9 +301,7 @@ class TestEdgeCases:
         assert rc == 0
 
     def test_unicode_input(self):
-        stdout, stderr, rc = run_cli(
-            "What letter comes after \u00e9 in the French alphabet? Just the letter.\n"
-        )
+        stdout, stderr, rc = run_cli("Is \u00e9 a vowel? Reply just yes.\n")
         assert rc == 0
         # Just verify no crash with unicode
 

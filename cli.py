@@ -196,6 +196,12 @@ def main():
     parser.add_argument(
         "-p",
         "--prepend",
+        metavar="STRING",
+        help="String to prepend to the first user message, followed by two newlines.",
+    )
+    parser.add_argument(
+        "-pf",
+        "--prepend-file",
         metavar="FILE",
         help="Plain text file whose contents will be prepended to the first user message.",
     )
@@ -350,6 +356,7 @@ def main():
             or args.model != core.DEFAULT_MODEL
             or args.batch_mode
             or args.prepend
+            or args.prepend_file
             or args.image
             or args.file
             or args.vectorize_file
@@ -385,8 +392,11 @@ def main():
         prompt = sys.stdin.read().strip()
 
         if args.prepend:
-            with open(args.prepend, "r") as f:
-                prompt = f.read() + "\n" + prompt
+            prompt = args.prepend + "\n\n" + prompt
+
+        if args.prepend_file:
+            with open(args.prepend_file, "r") as f:
+                prompt = f.read().strip() + "\n\n" + prompt
 
         def batch_input():
             return prompt
@@ -414,16 +424,20 @@ def main():
     else:
         input_f = cli_input
 
+    prefix = ""
     if args.prepend:
-        with open(args.prepend, "r") as f:
-            prefix = f.read()
+        prefix += args.prepend + "\n\n"
+    if args.prepend_file:
+        with open(args.prepend_file, "r") as f:
+            prefix += f.read().strip() + "\n\n"
 
+    if prefix:
         original_input_f = input_f
 
         def input_f_with_prepend():
             msg = original_input_f()
             if msg is not None:
-                msg = prefix + "\n" + msg
+                msg = prefix + msg
             return msg
 
         # Replace input_f for the first call only

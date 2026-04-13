@@ -371,9 +371,6 @@ def main():
             "cannot be combined with each other or other options."
         )
 
-    if args.vectorize_file and args.vector_store:
-        parser.error("--vectorize-file and --vector-store cannot be used together.")
-
     if args.list_known:
         known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
         for m in known_models:

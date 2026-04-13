@@ -284,8 +284,14 @@ class GptCore:
 
     def _consume_attachments(self):
         """Set up any pending vector store, then return and clear the per-message slots."""
-        if self._next_vectorize_paths and not self._vector_store_id:
-            self._setup_vector_store(self._next_vectorize_paths)
+        if self._next_vectorize_paths:
+            if not self._vector_store_id:
+                self._setup_vector_store(self._next_vectorize_paths)
+            else:
+                for path in self._next_vectorize_paths:
+                    file_id = self.upload_file(path, "assistants")
+                    self.add_vector_store_file(self._vector_store_id, file_id)
+                self.wait_for_vector_store(self._vector_store_id)
             self._next_vectorize_paths = None
         image_path, file_paths = self._next_image_path, self._next_file_paths
         self._next_image_path = None

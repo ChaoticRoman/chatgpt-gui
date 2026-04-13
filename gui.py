@@ -173,6 +173,8 @@ class JsonViewerApp(tk.Tk):
                     self.display_conversation(core.messages)
                     self._set_ui_idle()
                     self.input_text.focus()
+                    # Scroll after a short delay to let tkinterweb finish layout
+                    self.after(100, lambda: self.file_content_text.yview_moveto(1.0))
 
             self.after(0, update)
 
@@ -196,16 +198,14 @@ class JsonViewerApp(tk.Tk):
             self._input_queue.put(None)
 
     def _set_ui_busy(self):
-        self.send_button.config(state="disabled")
-        self.input_text.config(state="disabled")
-        self.progress_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.input_row.pack_forget()
+        self.progress_bar.pack(fill=tk.X, expand=True)
         self.progress_bar.start(10)
 
     def _set_ui_idle(self):
         self.progress_bar.stop()
         self.progress_bar.pack_forget()
-        self.send_button.config(state="normal")
-        self.input_text.config(state="normal")
+        self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
 
     def on_enter(self, event):
         """Handle Enter key press."""

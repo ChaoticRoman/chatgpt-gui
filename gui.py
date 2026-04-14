@@ -24,13 +24,13 @@ from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
 from core import (
-    DEFAULT_MODEL,
-    DATA_DIRECTORY,
     GptCore,
+    load_key,
+    DATA_DIRECTORY,
+    DEFAULT_MODEL,
     KNOWN_MODELS,
     IMAGE_EXTENSIONS,
     USER_DATA_EXTENSIONS,
-    load_key,
 )
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
@@ -43,7 +43,7 @@ class JsonViewerApp(tk.Tk):
         super().__init__()
 
         self.title("ChatGPT GUI")
-        self.geometry("1024x768")
+        self.geometry("1200x1000")
         self.minsize(800, 600)
 
         ttk.Style().configure("File.Treeview", font="TkFixedFont")

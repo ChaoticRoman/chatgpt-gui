@@ -407,11 +407,12 @@ def main():
             args.model,
             web_search=args.web_search,
             debug=args.debug,
-        ).one_shot(
+        ).main(
             image_path=args.image,
             file_paths=args.file,
             vectorize_file_paths=args.vectorize_file,
             vector_store_id=args.vector_store,
+            one_shot=True,
         )
         return
 

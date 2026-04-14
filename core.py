@@ -313,6 +313,7 @@ class GptCore:
         file_paths=None,
         vectorize_file_paths=None,
         vector_store_id=None,
+        one_shot=False,
     ):
         if not self.input or not self.output:
             raise RuntimeError("Calling main without input/output callback set.")
@@ -339,28 +340,8 @@ class GptCore:
                         price,
                     ),
                 )
-        finally:
-            self._teardown()
-
-    def one_shot(
-        self,
-        image_path=None,
-        file_paths=None,
-        vectorize_file_paths=None,
-        vector_store_id=None,
-    ):
-        if not self.input or not self.output:
-            raise RuntimeError("Calling one_shot without input/output callback set.")
-        self._init_session(
-            image_path, file_paths, vectorize_file_paths, vector_store_id
-        )
-        prompt = self.input()
-        if not prompt:
-            return
-        try:
-            img, fps = self._consume_attachments()
-            content, info = self.send(prompt, image_path=img, file_paths=fps)
-            self.output(content, info)
+                if one_shot:
+                    break
         finally:
             self._teardown()
 

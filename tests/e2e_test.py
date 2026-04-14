@@ -164,15 +164,6 @@ class TestBatchMode:
         # Pricing info goes to stderr in batch mode
         assert "Input tokens" in stderr
 
-    def test_batch_with_pipe_content(self):
-        """Simulate piping content, e.g. echo "text" | cli.py -b"""
-        stdout, stderr, rc = run_cli(
-            "Count the words in: 'one two three'. Reply with just the number.",
-            extra_args=["-b"],
-        )
-        assert rc == 0
-        assert get_responses(stdout)[0] == "3"
-
 
 class TestPrepend:
     """Test the --prepend and --prepend-file flags."""

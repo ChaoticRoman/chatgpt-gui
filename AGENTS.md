@@ -56,7 +56,7 @@ Both methods drive a conversation through two instance callbacks:
 - `input()` — returns the next prompt string, or a falsy value to end the session
 - `output(content, info)` — receives each response
 
-**Per-message attachments** are communicated via instance slots that the caller populates *before* unblocking `input()`. `main()` / `one_shot()` initialize these slots from their keyword parameters, so all callers — regardless of their concurrency model — use the same mechanism with no branching:
+**Per-message attachments** are communicated via instance slots that the caller populates *before* unblocking `input()`. `main()` initializes these slots from their keyword parameters, so all callers — regardless of their concurrency model — use the same mechanism with no branching:
 
 | Slot | Cleared after |
 |---|---|

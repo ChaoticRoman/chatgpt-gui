@@ -64,6 +64,8 @@ USD_PER_OUTPUT_TOKEN = {
 }
 assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
 
+KNOWN_MODELS = sorted(USD_PER_INPUT_TOKEN.keys())
+
 USD_PER_WEB_SEARCH_CALL = 0.01
 
 DATA_DIRECTORY = Path(
@@ -117,7 +119,14 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model, web_search=False, debug=False):  # noqa: A002 (input is a callback, not the builtin)
+    def __init__(
+        self,
+        input=None,
+        output=None,
+        model=DEFAULT_MODEL,
+        web_search=False,
+        debug=False,
+    ):  # noqa: A002 (input is a callback, not the builtin)
         self.input = input
         self.output = output
         self.model = model
@@ -305,6 +314,8 @@ class GptCore:
         vectorize_file_paths=None,
         vector_store_id=None,
     ):
+        if not self.input or not self.output:
+            raise RuntimeError("Calling main without input/output callback set.")
         self._init_session(
             image_path, file_paths, vectorize_file_paths, vector_store_id
         )
@@ -338,6 +349,8 @@ class GptCore:
         vectorize_file_paths=None,
         vector_store_id=None,
     ):
+        if not self.input or not self.output:
+            raise RuntimeError("Calling one_shot without input/output callback set.")
         self._init_session(
             image_path, file_paths, vectorize_file_paths, vector_store_id
         )

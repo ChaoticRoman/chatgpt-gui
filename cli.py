@@ -372,8 +372,7 @@ def main():
         )
 
     if args.list_known:
-        known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
-        for m in known_models:
+        for m in core.KNOWN_MODELS:
             print(m)
         return
 

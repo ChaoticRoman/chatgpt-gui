@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from core import USD_PER_INPUT_TOKEN
+from core import KNOWN_MODELS
 
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
@@ -838,7 +838,7 @@ class TestConcurrency:
 class TestAllModelsSmokeTest:
     """Smoke test: verify every in-code-priced model can handle a minimal prompt."""
 
-    @pytest.mark.parametrize("model", sorted(USD_PER_INPUT_TOKEN.keys()))
+    @pytest.mark.parametrize("model", KNOWN_MODELS)
     def test_model_responds(self, model):
         stdout, stderr, rc = run_cli(
             "Say ok.",

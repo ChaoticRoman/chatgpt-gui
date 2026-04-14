@@ -27,11 +27,15 @@ from core import (
     DEFAULT_MODEL,
     DATA_DIRECTORY,
     GptCore,
+    KNOWN_MODELS,
     IMAGE_EXTENSIONS,
-    USD_PER_INPUT_TOKEN,
     USER_DATA_EXTENSIONS,
     load_key,
 )
+
+TEMPORARY_VECTOR_STORE = "(temporary)"
+
+load_key()
 
 
 class JsonViewerApp(tk.Tk):
@@ -39,8 +43,8 @@ class JsonViewerApp(tk.Tk):
         super().__init__()
 
         self.title("ChatGPT GUI")
-        self.geometry("1000x700")
-        self.minsize(600, 400)
+        self.geometry("1024x768")
+        self.minsize(800, 600)
 
         ttk.Style().configure("File.Treeview", font="TkFixedFont")
 
@@ -105,7 +109,7 @@ class JsonViewerApp(tk.Tk):
 
         # Input frame at the bottom (inside vertical paned window)
         self.input_frame = tk.Frame(self.vpaned)
-        self.vpaned.add(self.input_frame, minsize=60)
+        self.vpaned.add(self.input_frame, minsize=100)
 
         self.input_row = tk.Frame(self.input_frame)
         self.input_row.pack(side=tk.TOP, fill=BOTH, expand=True)
@@ -114,19 +118,18 @@ class JsonViewerApp(tk.Tk):
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
 
         # Right panel: model/VS dropdowns → attachment list → buttons → send → web search
-        right_panel = tk.Frame(self.input_row)
-        right_panel.pack(side=RIGHT, fill=tk.Y)
+        attachments_panel = tk.Frame(self.input_row)
+        attachments_panel.pack(side=RIGHT, fill=tk.Y)
 
         # Model row
-        model_row = tk.Frame(right_panel)
+        model_row = tk.Frame(attachments_panel)
         model_row.pack(side=tk.TOP, fill=tk.X)
         tk.Label(model_row, text="Model:").pack(side=LEFT)
         self.model_var = tk.StringVar(value=DEFAULT_MODEL)
-        known_models = sorted(USD_PER_INPUT_TOKEN.keys())
         self.model_combo = ttk.Combobox(
             model_row,
             textvariable=self.model_var,
-            values=known_models,
+            values=KNOWN_MODELS,
             state="readonly",
             width=14,
         )
@@ -137,15 +140,15 @@ class JsonViewerApp(tk.Tk):
         self.model_fetch_btn.pack(side=LEFT)
 
         # Vector store row
-        vs_row = tk.Frame(right_panel)
+        vs_row = tk.Frame(attachments_panel)
         vs_row.pack(side=tk.TOP, fill=tk.X)
         tk.Label(vs_row, text="Vector store:").pack(side=LEFT)
-        self.vs_var = tk.StringVar(value="(temporary)")
+        self.vs_var = tk.StringVar(value=TEMPORARY_VECTOR_STORE)
         self._vs_id_map = {}  # display string -> vs_id
         self.vs_combo = ttk.Combobox(
             vs_row,
             textvariable=self.vs_var,
-            values=["(temporary)"],
+            values=[TEMPORARY_VECTOR_STORE],
             state="readonly",
             width=14,
         )
@@ -155,7 +158,7 @@ class JsonViewerApp(tk.Tk):
         )
         self.vs_fetch_btn.pack(side=LEFT)
 
-        att_list_frame = tk.Frame(right_panel)
+        att_list_frame = tk.Frame(attachments_panel)
         att_list_frame.pack(side=tk.TOP, fill=BOTH, expand=True)
 
         self.att_tree = ttk.Treeview(
@@ -175,20 +178,24 @@ class JsonViewerApp(tk.Tk):
         self.att_tree.bind("<Button-3>", self.on_att_right_click)
         self._attachment_data = {}  # iid -> (full_path, purpose)
 
-        Button(right_panel, text="Add attachment", command=self.add_attachment).pack(
-            side=tk.TOP, fill=tk.X
-        )
         Button(
-            right_panel, text="Add for vectorization", command=self.add_vectorization
+            attachments_panel, text="Add attachment", command=self.add_attachment
         ).pack(side=tk.TOP, fill=tk.X)
-        Button(right_panel, text="Clear", command=self.clear_attachments).pack(
+        Button(
+            attachments_panel,
+            text="Add for vectorization",
+            command=self.add_vectorization,
+        ).pack(side=tk.TOP, fill=tk.X)
+        Button(attachments_panel, text="Clear", command=self.clear_attachments).pack(
             side=tk.TOP, fill=tk.X
         )
 
-        self.send_button = Button(right_panel, text="Send", command=self.send_message)
+        self.send_button = Button(
+            attachments_panel, text="Send", command=self.send_message
+        )
         self.send_button.pack(side=tk.TOP, fill=tk.X)
 
-        ws_row = tk.Frame(right_panel)
+        ws_row = tk.Frame(attachments_panel)
         ws_row.pack(side=tk.TOP, fill=tk.X)
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
@@ -229,7 +236,7 @@ class JsonViewerApp(tk.Tk):
         self._sash_pos = None
 
         # Load the list of JSON files
-        self.load_json_files()
+        self.load_conversations()
 
         # Bind the table selection event to a function
         self.file_table.bind("<<TreeviewSelect>>", self.on_file_select)
@@ -256,7 +263,7 @@ class JsonViewerApp(tk.Tk):
             fixed.measure(self.file_table.item(i)["values"][0])
             for i in self.file_table.get_children()
         ]
-        fallback = fixed.measure("2026-04-13T10:30:00-abc123.json")
+        fallback = fixed.measure("2026-04-13T10:30:00-abc123")
         col_w = (max(widths) if widths else fallback) + 16
         sb_w = self.scrollbar.winfo_width() or 17
         self.file_table.column("file", width=col_w)
@@ -267,8 +274,8 @@ class JsonViewerApp(tk.Tk):
             core._input_queue.put(None)
         self.destroy()
 
-    def load_json_files(self):
-        """Load the list of JSON files from the hardcoded folder."""
+    def load_conversations(self):
+        """Load the list of conversations in file_table."""
         for item in self.file_table.get_children():
             self.file_table.delete(item)
         if os.path.exists(DATA_DIRECTORY):
@@ -287,8 +294,14 @@ class JsonViewerApp(tk.Tk):
 
     def toggle_sort(self):
         """Toggle sort order and reload file list."""
+        selection = self.file_table.selection()
+        selected_name = (
+            self.file_table.item(selection[0])["values"][0] if selection else None
+        )
         self.sort_descending = not self.sort_descending
-        self.load_json_files()
+        self.load_conversations()
+        if selected_name:
+            self._select_file_in_list(selected_name)
 
     def _save_draft(self):
         """Persist all per-conversation draft state for the active conversation."""
@@ -361,8 +374,7 @@ class JsonViewerApp(tk.Tk):
         if key in self._cores:
             self.gpt_core = self._cores[key]
             return
-        load_key()
-        core = GptCore(input=None, output=None, model=self.model_var.get())
+        core = GptCore()
         core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
@@ -372,8 +384,7 @@ class JsonViewerApp(tk.Tk):
     def new_conversation(self):
         """Start a blank conversation — GptCore.__init__ sets messages=[] and a fresh file path."""
         self._save_draft()
-        load_key()
-        core = GptCore(input=None, output=None, model=self.model_var.get())
+        core = GptCore()
         self._launch_core(core)
         self._set_ui_idle()
         self.input_text.delete("1.0", END)
@@ -463,7 +474,10 @@ class JsonViewerApp(tk.Tk):
         def on_save():
             # Called from the background thread after every _save(); schedule a
             # list refresh on the main thread so new conversations appear immediately.
-            self.after(0, lambda: self._refresh_list_if_new(core))
+            try:
+                self.after(0, lambda: self._refresh_list_if_new(core))
+            except tk.TclError:
+                pass  # window was destroyed before the response arrived
 
         core.input = gui_input
         core.output = gui_output
@@ -533,7 +547,10 @@ class JsonViewerApp(tk.Tk):
         self.gpt_core.model = self.model_var.get()
         self.gpt_core.web_search = self.web_search_var.get()
         vs_display = self.vs_var.get()
-        if vs_display != "(temporary)":
+        if vs_display == TEMPORARY_VECTOR_STORE:
+            if not self.gpt_core._vector_store_owned:
+                self.gpt_core._vector_store_id = None
+        else:
             vs_id = self._vs_id_map.get(vs_display)
             if vs_id:
                 self.gpt_core._vector_store_id = vs_id
@@ -574,6 +591,7 @@ class JsonViewerApp(tk.Tk):
             title="Add for vectorization",
             filetypes=[
                 ("Documents", " ".join(f"*{e}" for e in USER_DATA_EXTENSIONS)),
+                ("All files", "*.*"),
             ],
         )
         for path in paths:
@@ -597,23 +615,25 @@ class JsonViewerApp(tk.Tk):
             self.att_tree.delete(iid)
 
     def _copy_settings(self):
-        """Copy attachment settings (VS, attachments, web-search) to the settings clipboard."""
+        """Copy attachment settings (VS, attachments, web-search, model) to the settings clipboard."""
         self._settings_clipboard = {
             "attachments": list(self._attachment_data.values()),
             "vs": self.vs_var.get(),
             "web_search": self.web_search_var.get(),
+            "model": self.model_var.get(),
         }
         self.paste_settings_btn.config(state="normal")
 
     def _paste_settings(self):
-        """Apply settings from the clipboard into the current conversation draft."""
+        """Apply settings from the clipboard into the current conversation draft, attachments are appended."""
         if not self._settings_clipboard:
             return
-        self._clear_attachment_list()
         for full_path, purpose in self._settings_clipboard["attachments"]:
             self._insert_attachment(full_path, purpose)
         self.vs_var.set(self._settings_clipboard["vs"])
         self.web_search_var.set(self._settings_clipboard["web_search"])
+        if "model" in self._settings_clipboard:
+            self.model_var.set(self._settings_clipboard["model"])
 
     def on_att_right_click(self, event):
         iid = self.att_tree.identify_row(event.y)
@@ -632,14 +652,6 @@ class JsonViewerApp(tk.Tk):
             if row["values"][0] == display_name and "unsaved" in row["tags"]:
                 self.file_table.item(item, tags=())
                 return
-        # Fallback: file appeared without going through new_conversation (shouldn't happen)
-        if display_name not in {
-            self.file_table.item(i)["values"][0] for i in self.file_table.get_children()
-        }:
-            active_name = Path(self.gpt_core.file).stem if self.gpt_core else None
-            self.load_json_files()
-            if active_name:
-                self._select_file_in_list(active_name)
 
     def _select_file_in_list(self, filename):
         """Select the row matching filename in the treeview."""
@@ -656,10 +668,9 @@ class JsonViewerApp(tk.Tk):
 
         def do_fetch():
             try:
-                load_key()
-                models = GptCore(None, None, None).list_models()
+                models = GptCore().list_models()
             except Exception:
-                models = sorted(USD_PER_INPUT_TOKEN.keys())
+                models = KNOWN_MODELS
 
             def update():
                 current = self.model_var.get()
@@ -668,7 +679,10 @@ class JsonViewerApp(tk.Tk):
                     self.model_var.set(models[0])
                 self.model_fetch_btn.config(state="normal")
 
-            self.after(0, update)
+            try:
+                self.after(0, update)
+            except tk.TclError:
+                pass  # window was destroyed before the response arrived
 
         threading.Thread(target=do_fetch, daemon=True).start()
 
@@ -679,14 +693,13 @@ class JsonViewerApp(tk.Tk):
 
         def do_fetch():
             try:
-                load_key()
-                stores = GptCore(None, None, None).list_vector_stores()
+                stores = GptCore().list_vector_stores()
             except Exception:
                 stores = []
 
             def update():
                 self._vs_id_map = {}
-                display_list = ["(temporary)"]
+                display_list = [TEMPORARY_VECTOR_STORE]
                 name_counts = {}
                 for _vs_id, name, _status, _created_at in stores:
                     name_counts[name] = name_counts.get(name, 0) + 1
@@ -697,7 +710,10 @@ class JsonViewerApp(tk.Tk):
                 self.vs_combo.config(values=display_list, state="readonly")
                 self.vs_fetch_btn.config(state="normal")
 
-            self.after(0, update)
+            try:
+                self.after(0, update)
+            except tk.TclError:
+                pass  # window was destroyed before the response arrived
 
         threading.Thread(target=do_fetch, daemon=True).start()
 

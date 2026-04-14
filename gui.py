@@ -188,11 +188,25 @@ class JsonViewerApp(tk.Tk):
         self.send_button = Button(right_panel, text="Send", command=self.send_message)
         self.send_button.pack(side=tk.TOP, fill=tk.X)
 
+        ws_row = tk.Frame(right_panel)
+        ws_row.pack(side=tk.TOP, fill=tk.X)
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
-            right_panel, text="Web search", variable=self.web_search_var
+            ws_row, text="Web search", variable=self.web_search_var
         )
-        self.web_search_check.pack(side=tk.TOP, anchor="w")
+        self.web_search_check.pack(side=tk.LEFT, anchor="w")
+        Button(ws_row, text="⏵📋", command=self._copy_settings, padx=2, pady=0).pack(
+            side=tk.LEFT, fill=tk.X, expand=True
+        )
+        self.paste_settings_btn = Button(
+            ws_row,
+            text="📋⏵",
+            command=self._paste_settings,
+            padx=2,
+            pady=0,
+            state="disabled",
+        )
+        self.paste_settings_btn.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Progress bar shown while waiting for a response; hidden at rest
         self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
@@ -210,7 +224,8 @@ class JsonViewerApp(tk.Tk):
         self.gpt_core = None
         self._cores = {}
         self._busy_paths = set()
-        self._drafts = {}
+        self._drafts = {}  # file_path -> {text, attachments, model, vs, web_search}
+        self._settings_clipboard = None  # {attachments, vs, web_search}
         self._sash_pos = None
 
         # Load the list of JSON files
@@ -276,16 +291,30 @@ class JsonViewerApp(tk.Tk):
         self.load_json_files()
 
     def _save_draft(self):
-        """Persist the current input box contents for the active conversation."""
+        """Persist all per-conversation draft state for the active conversation."""
         if self.gpt_core:
-            self._drafts[str(self.gpt_core.file)] = self.input_text.get("1.0", "end-1c")
+            self._drafts[str(self.gpt_core.file)] = {
+                "text": self.input_text.get("1.0", "end-1c"),
+                "attachments": list(self._attachment_data.values()),
+                "model": self.model_var.get(),
+                "vs": self.vs_var.get(),
+                "web_search": self.web_search_var.get(),
+            }
 
     def _restore_draft(self, file_path):
-        """Populate the input box with any saved draft for file_path."""
+        """Restore all per-conversation draft state for file_path."""
+        draft = self._drafts.get(str(file_path), {})
         self.input_text.delete("1.0", END)
-        draft = self._drafts.get(str(file_path), "")
-        if draft:
-            self.input_text.insert("1.0", draft)
+        if text := draft.get("text", ""):
+            self.input_text.insert("1.0", text)
+        self._clear_attachment_list()
+        for full_path, purpose in draft.get("attachments", []):
+            self._insert_attachment(full_path, purpose)
+        if model := draft.get("model"):
+            self.model_var.set(model)
+        if vs := draft.get("vs"):
+            self.vs_var.set(vs)
+        self.web_search_var.set(draft.get("web_search", False))
 
     def on_file_select(self, event):
         """Display the content of the selected JSON file."""
@@ -302,7 +331,6 @@ class JsonViewerApp(tk.Tk):
             return
 
         self._save_draft()
-        self._clear_attachment_list()
         self.current_file_path = file_path
 
         if os.path.exists(file_path):
@@ -349,6 +377,7 @@ class JsonViewerApp(tk.Tk):
         self._launch_core(core)
         self._set_ui_idle()
         self.input_text.delete("1.0", END)
+        self._clear_attachment_list()
         self.file_table.selection_remove(*self.file_table.selection())
         # Add a gray placeholder entry so the user can navigate back before the first save
         display_name = Path(core.file).stem
@@ -566,6 +595,25 @@ class JsonViewerApp(tk.Tk):
         for iid in list(self.att_tree.selection()):
             del self._attachment_data[iid]
             self.att_tree.delete(iid)
+
+    def _copy_settings(self):
+        """Copy attachment settings (VS, attachments, web-search) to the settings clipboard."""
+        self._settings_clipboard = {
+            "attachments": list(self._attachment_data.values()),
+            "vs": self.vs_var.get(),
+            "web_search": self.web_search_var.get(),
+        }
+        self.paste_settings_btn.config(state="normal")
+
+    def _paste_settings(self):
+        """Apply settings from the clipboard into the current conversation draft."""
+        if not self._settings_clipboard:
+            return
+        self._clear_attachment_list()
+        for full_path, purpose in self._settings_clipboard["attachments"]:
+            self._insert_attachment(full_path, purpose)
+        self.vs_var.set(self._settings_clipboard["vs"])
+        self.web_search_var.set(self._settings_clipboard["web_search"])
 
     def on_att_right_click(self, event):
         iid = self.att_tree.identify_row(event.y)

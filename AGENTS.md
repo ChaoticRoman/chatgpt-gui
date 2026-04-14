@@ -40,6 +40,33 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 1. `make format`
 2. `make lint` — must pass cleanly
 
+## Architecture principles
+
+### `core.py` is client-agnostic
+
+`core.py` is a reusable library. It must not reference or special-case any specific caller. New clients (web frontends, backend libraries, …) will be added over time.
+
+Follow **SOLID**, especially:
+- **Single Responsibility** — `core.py` handles AI interaction only. I/O, presentation, and session management belong to the caller.
+- **Open/Closed** — extend behaviour through the defined callback and slot protocol; never add branches that check which kind of caller is in use.
+
+### Caller protocol for `main()` and `one_shot()`
+
+Both methods drive a conversation through two instance callbacks:
+- `input()` — returns the next prompt string, or a falsy value to end the session
+- `output(content, info)` — receives each response
+
+**Per-message attachments** are communicated via instance slots that the caller populates *before* unblocking `input()`. `main()` initializes these slots from their keyword parameters, so all callers — regardless of their concurrency model — use the same mechanism with no branching:
+
+| Slot | Cleared after |
+|---|---|
+| `_next_image_path` | every `send()` |
+| `_next_file_paths` | every `send()` |
+| `_next_vectorize_paths` | vector store creation |
+
+A synchronous caller sets these through keyword arguments.
+An event-driven caller sets them on the instance before signalling `input()` to unblock — safe because the consumer is always blocked on `input()` at that point.
+
 ## Code conventions
 
 - No `pyproject.toml` or `setup.py` — this is a flat script-based repo, not a package.
@@ -65,6 +92,10 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 ## Worktrees
 
 You may be running in a git worktree (e.g. `.claude/worktrees/...`). Your cwd is already set correctly — run `git`, `gh`, and other commands directly without `-C` or `cd`.
+
+## Code style
+
+- **DRY** — don't repeat yourself. Extract helpers rather than duplicating logic.
 
 ## Things to avoid
 

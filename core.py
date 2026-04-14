@@ -10,8 +10,26 @@ from pprint import pprint
 
 import openai
 
-# Best in non-agentic coding per https://livebench.ai/ (2026-01-08)
 DEFAULT_MODEL = "gpt-5.4"
+
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+USER_DATA_EXTENSIONS = (
+    ".csv",
+    ".doc",
+    ".docx",
+    ".html",
+    ".json",
+    ".md",
+    ".odt",
+    ".pdf",
+    ".ppt",
+    ".pptx",
+    ".rtf",
+    ".txt",
+    ".xls",
+    ".xlsx",
+    ".xml",
+)
 
 # Prices in USD, source: https://openai.com/api/pricing/
 USD_PER_INPUT_TOKEN = {
@@ -24,6 +42,8 @@ USD_PER_INPUT_TOKEN = {
     "gpt-5.2": 1.75e-6,
     "gpt-5.2-codex": 1.75e-6,
     "gpt-5.3-codex": 1.75e-6,
+    "gpt-5.4-nano": 0.2e-6,
+    "gpt-5.4-mini": 0.75e-6,
     "gpt-5.4": 2.5e-6,
     "gpt-5.4-pro": 30e-6,
 }
@@ -37,10 +57,14 @@ USD_PER_OUTPUT_TOKEN = {
     "gpt-5.2": 14e-6,
     "gpt-5.2-codex": 14e-6,
     "gpt-5.3-codex": 14e-6,
+    "gpt-5.4-nano": 1.25e-6,
+    "gpt-5.4-mini": 4.5e-6,
     "gpt-5.4": 15e-6,
     "gpt-5.4-pro": 180e-6,
 }
 assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
+
+KNOWN_MODELS = sorted(USD_PER_INPUT_TOKEN.keys())
 
 USD_PER_WEB_SEARCH_CALL = 0.01
 
@@ -95,7 +119,14 @@ class GptCore:
         The main loop to interact with the model.
     """
 
-    def __init__(self, input, output, model, web_search=False, debug=False):  # noqa: A002 (input is a callback, not the builtin)
+    def __init__(
+        self,
+        input=None,
+        output=None,
+        model=DEFAULT_MODEL,
+        web_search=False,
+        debug=False,
+    ):  # noqa: A002 (input is a callback, not the builtin)
         self.input = input
         self.output = output
         self.model = model
@@ -113,6 +144,8 @@ class GptCore:
         self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"
         os.makedirs(DATA_DIRECTORY, exist_ok=True)
         self.file = DATA_DIRECTORY / f"{self.conversation_id}.json"
+
+        self.save_callback = None
 
         self.client = openai.OpenAI()
 
@@ -179,6 +212,12 @@ class GptCore:
             self.delete_file(file_id)
         self._teardown_vector_store()
 
+    def _save(self):
+        with open(self.file, "w") as f:
+            json.dump([dict(m) for m in self.messages], f, sort_keys=True, indent=4)
+        if self.save_callback:
+            self.save_callback()
+
     def send(self, prompt, image_path=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
         content = []
@@ -194,6 +233,7 @@ class GptCore:
             content.append({"type": "input_file", "file_id": file_id})
         content.append({"type": "input_text", "text": prompt})
         self.messages.append({"role": "user", "content": content})
+        self._save()
 
         tools = []
         includes = []
@@ -225,9 +265,7 @@ class GptCore:
                 content += "\n\n**Sources:**\n" + "\n".join(
                     f"- [{s['title']}]({s['url']})" for s in sources
                 )
-        serialized = [dict(m) for m in self.messages]
-        with open(self.file, "w") as f:
-            json.dump(serialized, f, sort_keys=True, indent=4)
+        self._save()
 
         usage = response.usage
         input_tokens, output_tokens = usage.input_tokens, usage.output_tokens
@@ -240,31 +278,54 @@ class GptCore:
 
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
+    def _init_session(
+        self, image_path, file_paths, vectorize_file_paths, vector_store_id
+    ):
+        """Reset per-session state and populate the attachment slots."""
+        self._images = []
+        self._files = []
+        self._vector_store_id = vector_store_id or None
+        self._vector_store_owned = False
+        self._vector_files = []
+        self._next_image_path = image_path
+        self._next_file_paths = file_paths
+        self._next_vectorize_paths = vectorize_file_paths
+
+    def _consume_attachments(self):
+        """Set up any pending vector store, then return and clear the per-message slots."""
+        if self._next_vectorize_paths:
+            if not self._vector_store_id:
+                self._setup_vector_store(self._next_vectorize_paths)
+            else:
+                for path in self._next_vectorize_paths:
+                    file_id = self.upload_file(path, "assistants")
+                    self.add_vector_store_file(self._vector_store_id, file_id)
+                self.wait_for_vector_store(self._vector_store_id)
+            self._next_vectorize_paths = None
+        image_path, file_paths = self._next_image_path, self._next_file_paths
+        self._next_image_path = None
+        self._next_file_paths = None
+        return image_path, file_paths
+
     def main(
         self,
         image_path=None,
         file_paths=None,
         vectorize_file_paths=None,
         vector_store_id=None,
+        one_shot=False,
     ):
-        self._images = []
-        self._files = []
-        self._vector_store_id = None
-        self._vector_store_owned = False
-        self._vector_files = []
+        if not self.input or not self.output:
+            raise RuntimeError("Calling main without input/output callback set.")
+        self._init_session(
+            image_path, file_paths, vectorize_file_paths, vector_store_id
+        )
         price = 0.0
         total_web_search_calls = 0
         try:
-            if vector_store_id:
-                self._vector_store_id = vector_store_id
-            elif vectorize_file_paths:
-                self._setup_vector_store(vectorize_file_paths)
             while prompt := self.input():
-                content, info = self.send(
-                    prompt, image_path=image_path, file_paths=file_paths
-                )
-                image_path = None  # only attach files to the first message
-                file_paths = None
+                img, fps = self._consume_attachments()
+                content, info = self.send(prompt, image_path=img, file_paths=fps)
                 if price is not None and info.price is not None:
                     price += info.price
                 else:
@@ -279,33 +340,8 @@ class GptCore:
                         price,
                     ),
                 )
-        finally:
-            self._teardown()
-
-    def one_shot(
-        self,
-        image_path=None,
-        file_paths=None,
-        vectorize_file_paths=None,
-        vector_store_id=None,
-    ):
-        self._images = []
-        self._files = []
-        self._vector_store_id = None
-        self._vector_store_owned = False
-        self._vector_files = []
-        prompt = self.input()
-        if not prompt:
-            return
-        try:
-            if vector_store_id:
-                self._vector_store_id = vector_store_id
-            elif vectorize_file_paths:
-                self._setup_vector_store(vectorize_file_paths)
-            content, info = self.send(
-                prompt, image_path=image_path, file_paths=file_paths
-            )
-            self.output(content, info)
+                if one_shot:
+                    break
         finally:
             self._teardown()
 

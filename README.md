@@ -53,7 +53,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-i`, `--image` | Image file to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
-| `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search |
+| `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search; can be combined with `-vf` to upload additional files into it (files are kept after the session) |
 | `-r`, `--rich` | Render Markdown with rich text formatting in the terminal |
 | `-d`, `--debug` | Pretty-print raw API responses to stderr |
 | `-l`, `--list-known` | List models with known pricing |
@@ -95,6 +95,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 ./cli.py -b -vf contracts/*.pdf <<< "Which contracts mention arbitration?"
 ./cli.py -vf docs/*.pdf  # interactive Q&A session across a document collection
 ./cli.py -vs vs_abc123   # interactive Q&A using a pre-existing vector store
+./cli.py -vs vs_abc123 -vf extra.pdf  # same, but also upload extra.pdf into it (file kept after session)
 ```
 
 The tool is quite powerful with `guake` drop-down terminal and alias like this:

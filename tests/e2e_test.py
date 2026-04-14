@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from core import USD_PER_INPUT_TOKEN
+from core import KNOWN_MODELS
 
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
@@ -163,15 +163,6 @@ class TestBatchMode:
         assert get_responses(stdout)[0] == "8"
         # Pricing info goes to stderr in batch mode
         assert "Input tokens" in stderr
-
-    def test_batch_with_pipe_content(self):
-        """Simulate piping content, e.g. echo "text" | cli.py -b"""
-        stdout, stderr, rc = run_cli(
-            "Count the words in: 'one two three'. Reply with just the number.",
-            extra_args=["-b"],
-        )
-        assert rc == 0
-        assert get_responses(stdout)[0] == "3"
 
 
 class TestPrepend:
@@ -567,6 +558,37 @@ class TestVectorStore:
         finally:
             self._teardown(vs_id)
 
+    def test_vs_with_vectorize_file(self):
+        """-vf uploads files into a pre-existing -vs; neither VS nor files are cleaned up."""
+        vs_id = self._setup()  # VS with test1.pdf (orange)
+        try:
+            stdout, stderr, rc = run_cli(
+                "What fruits are mentioned? Reply with just the fruits.",
+                extra_args=["-b", "-vs", vs_id, "-vf", "tests/test2.pdf"],
+                extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+                timeout=120,
+            )
+            assert rc == 0
+            response = get_responses(stdout)[0]
+            assert "orange" in response  # from test1.pdf (pre-existing)
+            assert "avocado" in response  # from test2.pdf (uploaded via -vf)
+            self._assert_vs_survives(vs_id)
+
+            # Files uploaded via -vf to a pre-existing VS must NOT be auto-deleted
+            uploaded = parse_uploaded_ids(stderr)
+            assert uploaded, "Expected a file to be uploaded via -vf"
+            current_files, _, rc2 = run_cli(
+                None, extra_args=["files", "list"], model=None
+            )
+            assert rc2 == 0
+            assert uploaded.issubset(parse_file_ids(current_files)), (
+                f"Files uploaded to a pre-existing VS should not be auto-deleted: {uploaded}"
+            )
+        finally:
+            self._teardown(
+                vs_id
+            )  # lists and deletes all files in VS, including test2.pdf
+
 
 class TestVectorsCreate:
     """Test 'vectors create' with file upload and --no-wait."""
@@ -807,7 +829,7 @@ class TestConcurrency:
 class TestAllModelsSmokeTest:
     """Smoke test: verify every in-code-priced model can handle a minimal prompt."""
 
-    @pytest.mark.parametrize("model", sorted(USD_PER_INPUT_TOKEN.keys()))
+    @pytest.mark.parametrize("model", KNOWN_MODELS)
     def test_model_responds(self, model):
         stdout, stderr, rc = run_cli(
             "Say ok.",

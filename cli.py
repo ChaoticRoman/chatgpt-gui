@@ -371,12 +371,8 @@ def main():
             "cannot be combined with each other or other options."
         )
 
-    if args.vectorize_file and args.vector_store:
-        parser.error("--vectorize-file and --vector-store cannot be used together.")
-
     if args.list_known:
-        known_models = sorted(core.USD_PER_INPUT_TOKEN.keys())
-        for m in known_models:
+        for m in core.KNOWN_MODELS:
             print(m)
         return
 
@@ -411,11 +407,12 @@ def main():
             args.model,
             web_search=args.web_search,
             debug=args.debug,
-        ).one_shot(
+        ).main(
             image_path=args.image,
             file_paths=args.file,
             vectorize_file_paths=args.vectorize_file,
             vector_store_id=args.vector_store,
+            one_shot=True,
         )
         return
 

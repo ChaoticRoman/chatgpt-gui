@@ -28,6 +28,7 @@ from core import (
     DATA_DIRECTORY,
     GptCore,
     IMAGE_EXTENSIONS,
+    USD_PER_INPUT_TOKEN,
     USER_DATA_EXTENSIONS,
     load_key,
 )
@@ -112,9 +113,47 @@ class JsonViewerApp(tk.Tk):
         self.input_text = Text(self.input_row, height=3)
         self.input_text.pack(side=LEFT, fill=BOTH, expand=True)
 
-        # Right panel: attachment list → buttons → web search → send
+        # Right panel: model/VS dropdowns → attachment list → buttons → send → web search
         right_panel = tk.Frame(self.input_row)
         right_panel.pack(side=RIGHT, fill=tk.Y)
+
+        # Model row
+        model_row = tk.Frame(right_panel)
+        model_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(model_row, text="Model:").pack(side=LEFT)
+        self.model_var = tk.StringVar(value=DEFAULT_MODEL)
+        known_models = sorted(USD_PER_INPUT_TOKEN.keys())
+        self.model_combo = ttk.Combobox(
+            model_row,
+            textvariable=self.model_var,
+            values=known_models,
+            state="readonly",
+            width=14,
+        )
+        self.model_combo.pack(side=LEFT, fill=tk.X, expand=True)
+        self.model_fetch_btn = Button(
+            model_row, text="⏬", command=self._fetch_all_models, padx=2, pady=0
+        )
+        self.model_fetch_btn.pack(side=LEFT)
+
+        # Vector store row
+        vs_row = tk.Frame(right_panel)
+        vs_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(vs_row, text="Vector store:").pack(side=LEFT)
+        self.vs_var = tk.StringVar(value="(temporary)")
+        self._vs_id_map = {}  # display string -> vs_id
+        self.vs_combo = ttk.Combobox(
+            vs_row,
+            textvariable=self.vs_var,
+            values=["(temporary)"],
+            state="readonly",
+            width=14,
+        )
+        self.vs_combo.pack(side=LEFT, fill=tk.X, expand=True)
+        self.vs_fetch_btn = Button(
+            vs_row, text="⏬", command=self._fetch_vector_stores, padx=2, pady=0
+        )
+        self.vs_fetch_btn.pack(side=LEFT)
 
         att_list_frame = tk.Frame(right_panel)
         att_list_frame.pack(side=tk.TOP, fill=BOTH, expand=True)
@@ -146,14 +185,14 @@ class JsonViewerApp(tk.Tk):
             side=tk.TOP, fill=tk.X
         )
 
+        self.send_button = Button(right_panel, text="Send", command=self.send_message)
+        self.send_button.pack(side=tk.TOP, fill=tk.X)
+
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
             right_panel, text="Web search", variable=self.web_search_var
         )
         self.web_search_check.pack(side=tk.TOP, anchor="w")
-
-        self.send_button = Button(right_panel, text="Send", command=self.send_message)
-        self.send_button.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Progress bar shown while waiting for a response; hidden at rest
         self.progress_bar = ttk.Progressbar(self.input_frame, mode="indeterminate")
@@ -222,13 +261,13 @@ class JsonViewerApp(tk.Tk):
                 [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")],
                 reverse=self.sort_descending,
             ):
-                self.file_table.insert("", END, values=(file,))
+                self.file_table.insert("", END, values=(file.removesuffix(".json"),))
         # Re-add unsaved conversations that exist in memory but not yet on disk
         for core in getattr(self, "_cores", {}).values():
             if not Path(core.file).exists():
                 pos = 0 if self.sort_descending else END
                 self.file_table.insert(
-                    "", pos, values=(Path(core.file).name,), tags=("unsaved",)
+                    "", pos, values=(Path(core.file).stem,), tags=("unsaved",)
                 )
 
     def toggle_sort(self):
@@ -254,7 +293,7 @@ class JsonViewerApp(tk.Tk):
         if not selection:
             return
 
-        file_name = self.file_table.item(selection[0])["values"][0]
+        file_name = self.file_table.item(selection[0])["values"][0] + ".json"
         file_path = os.path.join(DATA_DIRECTORY, file_name)
 
         # Skip reinit when this is already the active conversation (e.g. after
@@ -295,7 +334,7 @@ class JsonViewerApp(tk.Tk):
             self.gpt_core = self._cores[key]
             return
         load_key()
-        core = GptCore(input=None, output=None, model=DEFAULT_MODEL)
+        core = GptCore(input=None, output=None, model=self.model_var.get())
         core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
@@ -306,16 +345,16 @@ class JsonViewerApp(tk.Tk):
         """Start a blank conversation — GptCore.__init__ sets messages=[] and a fresh file path."""
         self._save_draft()
         load_key()
-        core = GptCore(input=None, output=None, model=DEFAULT_MODEL)
+        core = GptCore(input=None, output=None, model=self.model_var.get())
         self._launch_core(core)
         self._set_ui_idle()
         self.input_text.delete("1.0", END)
         self.file_table.selection_remove(*self.file_table.selection())
         # Add a gray placeholder entry so the user can navigate back before the first save
-        file_name = Path(core.file).name
+        display_name = Path(core.file).stem
         pos = 0 if self.sort_descending else END
-        self.file_table.insert("", pos, values=(file_name,), tags=("unsaved",))
-        self._select_file_in_list(file_name)
+        self.file_table.insert("", pos, values=(display_name,), tags=("unsaved",))
+        self._select_file_in_list(display_name)
         self.display_conversation([])
 
     def delete_conversation(self):
@@ -333,7 +372,7 @@ class JsonViewerApp(tk.Tk):
             else (children[idx - 1] if idx > 0 else None)
         )
 
-        file_name = self.file_table.item(item)["values"][0]
+        file_name = self.file_table.item(item)["values"][0] + ".json"
         file_path = os.path.join(DATA_DIRECTORY, file_name)
         key = str(file_path)
 
@@ -385,7 +424,7 @@ class JsonViewerApp(tk.Tk):
                     self.input_text.focus()
                     # Scroll after a short delay to let tkinterweb finish layout
                     self.after(100, lambda: self.file_content_text.yview_moveto(1.0))
-                    self._select_file_in_list(Path(core.file).name)
+                    self._select_file_in_list(Path(core.file).stem)
 
             try:
                 self.after(0, update)
@@ -462,7 +501,14 @@ class JsonViewerApp(tk.Tk):
         )
 
         self.input_text.delete("1.0", END)
+        self.gpt_core.model = self.model_var.get()
         self.gpt_core.web_search = self.web_search_var.get()
+        vs_display = self.vs_var.get()
+        if vs_display != "(temporary)":
+            vs_id = self._vs_id_map.get(vs_display)
+            if vs_id:
+                self.gpt_core._vector_store_id = vs_id
+                self.gpt_core._vector_store_owned = False
         self._busy_paths.add(str(self.gpt_core.file))
         self._set_ui_busy()
 
@@ -532,17 +578,17 @@ class JsonViewerApp(tk.Tk):
 
     def _refresh_list_if_new(self, core):
         """On first save of a new conversation, clear the gray 'unsaved' tag."""
-        file_name = Path(core.file).name
+        display_name = Path(core.file).stem
         for item in self.file_table.get_children():
             row = self.file_table.item(item)
-            if row["values"][0] == file_name and "unsaved" in row["tags"]:
+            if row["values"][0] == display_name and "unsaved" in row["tags"]:
                 self.file_table.item(item, tags=())
                 return
         # Fallback: file appeared without going through new_conversation (shouldn't happen)
-        if file_name not in {
+        if display_name not in {
             self.file_table.item(i)["values"][0] for i in self.file_table.get_children()
         }:
-            active_name = Path(self.gpt_core.file).name if self.gpt_core else None
+            active_name = Path(self.gpt_core.file).stem if self.gpt_core else None
             self.load_json_files()
             if active_name:
                 self._select_file_in_list(active_name)
@@ -554,6 +600,58 @@ class JsonViewerApp(tk.Tk):
                 self.file_table.selection_set(item)
                 self.file_table.see(item)
                 break
+
+    def _fetch_all_models(self):
+        """Fetch all API models in the background and repopulate the model combo."""
+        self.model_combo.config(state="disabled")
+        self.model_fetch_btn.config(state="disabled")
+
+        def do_fetch():
+            try:
+                load_key()
+                models = GptCore(None, None, None).list_models()
+            except Exception:
+                models = sorted(USD_PER_INPUT_TOKEN.keys())
+
+            def update():
+                current = self.model_var.get()
+                self.model_combo.config(values=models, state="readonly")
+                if current not in models and models:
+                    self.model_var.set(models[0])
+                self.model_fetch_btn.config(state="normal")
+
+            self.after(0, update)
+
+        threading.Thread(target=do_fetch, daemon=True).start()
+
+    def _fetch_vector_stores(self):
+        """Fetch all vector stores in the background and repopulate the VS combo."""
+        self.vs_combo.config(state="disabled")
+        self.vs_fetch_btn.config(state="disabled")
+
+        def do_fetch():
+            try:
+                load_key()
+                stores = GptCore(None, None, None).list_vector_stores()
+            except Exception:
+                stores = []
+
+            def update():
+                self._vs_id_map = {}
+                display_list = ["(temporary)"]
+                name_counts = {}
+                for _vs_id, name, _status, _created_at in stores:
+                    name_counts[name] = name_counts.get(name, 0) + 1
+                for vs_id, name, _status, _created_at in stores:
+                    label = vs_id if not name or name_counts[name] > 1 else name
+                    self._vs_id_map[label] = vs_id
+                    display_list.append(label)
+                self.vs_combo.config(values=display_list, state="readonly")
+                self.vs_fetch_btn.config(state="normal")
+
+            self.after(0, update)
+
+        threading.Thread(target=do_fetch, daemon=True).start()
 
     # context switch to allow code to check CTRL+C in console
     def check(self):

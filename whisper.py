@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 import sys
+from libopenai.auth import initialize_client
 
-from openai import OpenAI
-
-from core import load_key
-
-load_key()
-client = OpenAI()
+client = initialize_client()
 
 with open(sys.argv[1], "rb") as audio_file:
     transcription = client.audio.transcriptions.create(

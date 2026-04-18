@@ -23,19 +23,18 @@ from tkinterweb import HtmlFrame
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
-from core import (
-    GptCore,
-    load_key,
+from libopenai.auth import initialize_client
+from libopenai.core import GptCore
+from libopenai.vectors import Vectors
+from libopenai.constants import (
     DATA_DIRECTORY,
     DEFAULT_MODEL,
-    KNOWN_MODELS,
     IMAGE_EXTENSIONS,
     USER_DATA_EXTENSIONS,
 )
+from libopenai.pricing import KNOWN_MODELS
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
-
-load_key()
 
 
 class JsonViewerApp(tk.Tk):
@@ -221,6 +220,8 @@ class JsonViewerApp(tk.Tk):
         # Bind Enter key to send message (Shift+Enter for newline)
         self.input_text.bind("<Return>", self.on_enter)
 
+        self.client = initialize_client()
+
         # Core and conversation state:
         #   _cores       — one live GptCore (with its thread) per file path; reused on
         #                  switch-back so in-progress requests survive navigation
@@ -374,7 +375,7 @@ class JsonViewerApp(tk.Tk):
         if key in self._cores:
             self.gpt_core = self._cores[key]
             return
-        core = GptCore()
+        core = GptCore(client=self.client)
         core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
@@ -384,7 +385,7 @@ class JsonViewerApp(tk.Tk):
     def new_conversation(self):
         """Start a blank conversation — GptCore.__init__ sets messages=[] and a fresh file path."""
         self._save_draft()
-        core = GptCore()
+        core = GptCore(client=self.client)
         self._launch_core(core)
         self._set_ui_idle()
         self.input_text.delete("1.0", END)
@@ -668,7 +669,7 @@ class JsonViewerApp(tk.Tk):
 
         def do_fetch():
             try:
-                models = GptCore().list_models()
+                models = GptCore(client=self.client).list_models()
             except Exception:
                 models = KNOWN_MODELS
 
@@ -693,7 +694,7 @@ class JsonViewerApp(tk.Tk):
 
         def do_fetch():
             try:
-                stores = GptCore().list_vector_stores()
+                stores = Vectors(self.client).list_vector_stores()
             except Exception:
                 stores = []
 

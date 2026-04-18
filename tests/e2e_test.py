@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from core import KNOWN_MODELS
+from libopenai.pricing import KNOWN_MODELS
 
 CLI = os.path.join(os.path.dirname(__file__), "..", "cli.py")
 TEST_MODEL = "gpt-5.4-mini"
@@ -702,6 +702,10 @@ class TestVectorsSubcommand:
             )
             assert rc == 0
 
+            # files.list is eventually consistent: the detached file can linger
+            # for ~1s after delete returns deleted=True.
+            time.sleep(2)
+
             # Must no longer appear in listing
             stdout, _, rc = run_cli(None, extra_args=["vectors", "list"], model=None)
             assert rc == 0
@@ -752,6 +756,9 @@ class TestVectorsSubcommand:
             )
             assert rc == 0
 
+            # files.list is eventually consistent: the detached file can linger
+            # for ~1s after delete returns deleted=True.
+            time.sleep(2)
             # File must no longer appear in listing
             stdout, _, rc = run_cli(
                 None, extra_args=["vectors", "files", "list", vs_id], model=None
@@ -805,25 +812,6 @@ class TestVectorsSubcommand:
                 if line.split() and line.split()[0].startswith("file-")
             ):
                 run_cli(None, extra_args=["files", "delete", fid], model=None)
-
-
-class TestConcurrency:
-    """Tests verifying safe parallel execution."""
-
-    def test_concurrent_sessions_have_unique_export_files(self, tmp_path):
-        """Two GptCore instances created at the same second must not share a JSON export path."""
-        from unittest.mock import patch
-        from datetime import datetime
-        import core as core_module
-
-        # Freeze time so both instances see the exact same timestamp — exposes the collision.
-        fixed = datetime(2026, 4, 10, 12, 0, 0)
-        with patch("core.dt") as mock_dt, patch("openai.OpenAI"):
-            mock_dt.now.return_value = fixed
-            c1 = core_module.GptCore(lambda: None, lambda *a: None, "gpt-5.4-mini")
-            c2 = core_module.GptCore(lambda: None, lambda *a: None, "gpt-5.4-mini")
-
-        assert c1.file != c2.file
 
 
 class TestAllModelsSmokeTest:

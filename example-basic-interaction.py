@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-import openai
 import sys
 
-import core
+from libopenai.auth import initialize_client
 
-MODEL = "gpt-5.3-codex"
+MODEL = "gpt-5.4"
 
-core.load_key()
-client = openai.OpenAI()
+client = initialize_client()
 
 prompt = " ".join(sys.argv[1:])
 

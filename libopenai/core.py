@@ -1,5 +1,4 @@
 import os
-import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,76 +7,11 @@ import sys
 from datetime import datetime as dt
 from pprint import pprint
 
-import openai
-
-DEFAULT_MODEL = "gpt-5.4"
-
-IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
-USER_DATA_EXTENSIONS = (
-    ".csv",
-    ".doc",
-    ".docx",
-    ".html",
-    ".json",
-    ".md",
-    ".odt",
-    ".pdf",
-    ".ppt",
-    ".pptx",
-    ".rtf",
-    ".txt",
-    ".xls",
-    ".xlsx",
-    ".xml",
-)
-
-# Prices in USD, source: https://openai.com/api/pricing/
-USD_PER_INPUT_TOKEN = {
-    "o1": 15e-6,
-    "o3-pro": 20e-6,
-    "o3-mini": 1.1e-6,
-    "o4-mini": 1.1e-6,
-    "gpt-5": 1.25e-6,
-    "gpt-5.1": 1.25e-6,
-    "gpt-5.2": 1.75e-6,
-    "gpt-5.2-codex": 1.75e-6,
-    "gpt-5.3-codex": 1.75e-6,
-    "gpt-5.4-nano": 0.2e-6,
-    "gpt-5.4-mini": 0.75e-6,
-    "gpt-5.4": 2.5e-6,
-    "gpt-5.4-pro": 30e-6,
-}
-USD_PER_OUTPUT_TOKEN = {
-    "o1": 60e-6,
-    "o3-pro": 80e-6,
-    "o3-mini": 4.4e-6,
-    "o4-mini": 4.4e-6,
-    "gpt-5": 10e-6,
-    "gpt-5.1": 10e-6,
-    "gpt-5.2": 14e-6,
-    "gpt-5.2-codex": 14e-6,
-    "gpt-5.3-codex": 14e-6,
-    "gpt-5.4-nano": 1.25e-6,
-    "gpt-5.4-mini": 4.5e-6,
-    "gpt-5.4": 15e-6,
-    "gpt-5.4-pro": 180e-6,
-}
-assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
-
-KNOWN_MODELS = sorted(USD_PER_INPUT_TOKEN.keys())
-
-USD_PER_WEB_SEARCH_CALL = 0.01
-
-DATA_DIRECTORY = Path(
-    os.environ.get("CHATGPT_GUI_DATA_DIR", Path.home() / ".chatgpt-gui")
-).expanduser()
-
-
-def load_key():
-    if "OPENAI_API_KEY" not in os.environ:
-        api_key_path = os.path.join(os.path.dirname(__file__), ".api_key")
-        with open(api_key_path, "r") as f:
-            os.environ["OPENAI_API_KEY"] = f.read().strip()
+from .pricing import USD_PER_TOKEN, USD_PER_WEB_SEARCH_CALL
+from .constants import DEFAULT_MODEL, DATA_DIRECTORY
+from .auth import initialize_client
+from .files import Files
+from .vectors import Vectors
 
 
 def _extract_sources(response):
@@ -126,6 +60,7 @@ class GptCore:
         model=DEFAULT_MODEL,
         web_search=False,
         debug=False,
+        client=None,
     ):  # noqa: A002 (input is a callback, not the builtin)
         self.input = input
         self.output = output
@@ -147,69 +82,44 @@ class GptCore:
 
         self.save_callback = None
 
-        self.client = openai.OpenAI()
+        self.client = initialize_client(client)
+        self.files_api = Files(self.client)
+        self.vectors_api = Vectors(self.client)
 
     def _compute_price(self, input_tokens, output_tokens, web_search_calls=0):
-        if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
+        if self.model in USD_PER_TOKEN:
             return (
-                USD_PER_INPUT_TOKEN[self.model] * input_tokens
-                + USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
+                USD_PER_TOKEN[self.model].input * input_tokens
+                + USD_PER_TOKEN[self.model].output * output_tokens
                 + USD_PER_WEB_SEARCH_CALL * web_search_calls
             )
         return None
 
-    def upload_file(self, path, purpose):
-        """Upload a file and return the file ID."""
-        assert purpose in ("vision", "user_data", "assistants")
-        print(f"Uploading {Path(path).name}...", end="", file=sys.stderr, flush=True)
-        with open(path, "rb") as f:
-            file = self.client.files.create(file=f, purpose=purpose)
-        print(" done.", file=sys.stderr)
-        if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
-            print(f"uploaded:{file.id}", file=sys.stderr)
-        return file.id
-
-    def delete_file(self, file_id):
-        """Delete a previously uploaded file."""
-        print(f"Deleting {file_id}...", end="", file=sys.stderr, flush=True)
-        self.client.files.delete(file_id)
-        print(" done.", file=sys.stderr)
-
-    def wait_for_vector_store(self, vs_id):
-        """Block until a vector store has finished indexing."""
-        print("Processing...", end="", file=sys.stderr, flush=True)
-        while True:
-            vs = self.client.vector_stores.retrieve(vs_id)
-            if vs.status == "completed":
-                break
-            print(".", end="", file=sys.stderr, flush=True)
-            time.sleep(2)
-        print(" done.", file=sys.stderr)
-
     def _setup_vector_store(self, file_paths):
         """Upload files to a new vector store and wait for processing to complete."""
-        vector_store = self.client.vector_stores.create(name=self.conversation_id)
-        self._vector_store_id = vector_store.id
+        self._vector_store_id = self.vectors_api.create_vector_store(
+            name=self.conversation_id
+        )
         self._vector_store_owned = True
         if os.environ.get("CHATGPT_CLI_LOG_UPLOAD_IDS"):
-            print(f"vector_store:{vector_store.id}", file=sys.stderr)
+            print(f"vector_store:{self._vector_store_id}", file=sys.stderr)
         for path in file_paths:
-            file_id = self.upload_file(path, "assistants")
+            file_id = self.files_api.upload_file(path, "assistants")
             self._vector_files.append((Path(path).name, file_id))
-            self.add_vector_store_file(vector_store.id, file_id)
-        self.wait_for_vector_store(vector_store.id)
+            self.vectors_api.add_vector_store_file(self._vector_store_id, file_id)
+        self.vectors_api.wait_for_vector_store(self._vector_store_id)
 
     def _teardown_vector_store(self):
         """Delete the vector store and its files."""
         if self._vector_store_id and self._vector_store_owned:
-            self.delete_vector_store(self._vector_store_id)
+            self.vectors_api.delete_vector_store(self._vector_store_id)
             for _, file_id in self._vector_files:
-                self.delete_file(file_id)
+                self.files_api.delete_file(file_id)
 
-    def _teardown(self):
-        """Delete all uploaded files and the vector store."""
+    def _teardown_files(self):
+        """Delete all uploaded user files and the vector store."""
         for _, file_id in self._images + self._files:
-            self.delete_file(file_id)
+            self.files_api.delete_file(file_id)
         self._teardown_vector_store()
 
     def _save(self):
@@ -223,12 +133,12 @@ class GptCore:
         content = []
         if image_path:
             name = Path(image_path).name
-            file_id = self.upload_file(image_path, "vision")
+            file_id = self.files_api.upload_file(image_path, "vision")
             self._images.append((name, file_id))
             content.append({"type": "input_image", "file_id": file_id})
         for path in file_paths or []:
             name = Path(path).name
-            file_id = self.upload_file(path, "user_data")
+            file_id = self.files_api.upload_file(path, "user_data")
             self._files.append((name, file_id))
             content.append({"type": "input_file", "file_id": file_id})
         content.append({"type": "input_text", "text": prompt})
@@ -292,15 +202,17 @@ class GptCore:
         self._next_vectorize_paths = vectorize_file_paths
 
     def _consume_attachments(self):
-        """Set up any pending vector store, then return and clear the per-message slots."""
+        """Set up any pending vector store and files, then return and clear the per-message slots."""
         if self._next_vectorize_paths:
             if not self._vector_store_id:
                 self._setup_vector_store(self._next_vectorize_paths)
             else:
                 for path in self._next_vectorize_paths:
-                    file_id = self.upload_file(path, "assistants")
-                    self.add_vector_store_file(self._vector_store_id, file_id)
-                self.wait_for_vector_store(self._vector_store_id)
+                    file_id = self.files_api.upload_file(path, "assistants")
+                    self.vectors_api.add_vector_store_file(
+                        self._vector_store_id, file_id
+                    )
+                self.vectors_api.wait_for_vector_store(self._vector_store_id)
             self._next_vectorize_paths = None
         image_path, file_paths = self._next_image_path, self._next_file_paths
         self._next_image_path = None
@@ -343,56 +255,7 @@ class GptCore:
                 if one_shot:
                     break
         finally:
-            self._teardown()
-
-    def list_files(self):
-        """Return list of (id, filename, bytes, purpose, created_at, expires_at) tuples."""
-        return [
-            (
-                f.id,
-                f.filename,
-                f.bytes,
-                f.purpose,
-                f.created_at,
-                getattr(f, "expires_at", None),
-            )
-            for f in self.client.files.list().data
-        ]
-
-    def create_vector_store(self, name):
-        """Create a new vector store and return its ID."""
-        vs = self.client.vector_stores.create(name=name)
-        return vs.id
-
-    def delete_vector_store(self, vs_id):
-        """Delete a vector store by ID."""
-        print(f"Deleting {vs_id}...", end="", file=sys.stderr, flush=True)
-        self.client.vector_stores.delete(vs_id)
-        print(" done.", file=sys.stderr)
-
-    def list_vector_stores(self):
-        """Return list of (id, name, status, created_at) tuples for vector stores."""
-        return [
-            (vs.id, vs.name or "", vs.status, vs.created_at)
-            for vs in self.client.vector_stores.list().data
-        ]
-
-    def list_vector_store_files(self, vs_id):
-        """Return list of (id, status, created_at) tuples for files in a vector store."""
-        return [
-            (f.id, f.status, f.created_at)
-            for f in self.client.vector_stores.files.list(vector_store_id=vs_id).data
-        ]
-
-    def add_vector_store_file(self, vs_id, file_id):
-        """Add a file to a vector store."""
-        self.client.vector_stores.files.create(vector_store_id=vs_id, file_id=file_id)
-
-    def delete_vector_store_file(self, vs_id, file_id):
-        """Remove a file from a vector store."""
-        print(f"Deleting {file_id}...", end="", file=sys.stderr, flush=True)
-        self.client.vector_stores.files.delete(vector_store_id=vs_id, file_id=file_id)
-        print(" done.", file=sys.stderr)
+            self._teardown_files()
 
     def list_models(self):
         return sorted([m["id"] for m in self.client.models.list().to_dict()["data"]])  # type: ignore

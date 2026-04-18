@@ -10,7 +10,11 @@ import readline  # noqa F401
 from rich.console import Console
 from rich.markdown import Markdown
 
-import core
+from libopenai import core
+from libopenai.pricing import KNOWN_MODELS
+from libopenai.constants import DEFAULT_MODEL
+from libopenai.files import Files
+from libopenai.vectors import Vectors
 
 console = Console()
 
@@ -184,8 +188,8 @@ def main():
     parser.add_argument(
         "-M",
         "--model",
-        default=core.DEFAULT_MODEL,
-        help=f"Use different model than {core.DEFAULT_MODEL}",
+        default=DEFAULT_MODEL,
+        help=f"Use different model than {DEFAULT_MODEL}",
     )
     parser.add_argument(
         "-b",
@@ -264,10 +268,9 @@ def main():
     args = parser.parse_args()
 
     if args.command == "files":
-        core.load_key()
-        gpt = core.GptCore(None, None, None)
+        files_api = Files()
         if args.files_command == "list":
-            files = gpt.list_files()
+            files = files_api.list_files()
             if not files:
                 return
             rows = [
@@ -281,23 +284,22 @@ def main():
             )
         elif args.files_command == "add":
             for path in args.files:
-                file_id = gpt.upload_file(path, "user_data")
+                file_id = files_api.upload_file(path, "user_data")
                 print(file_id)
         elif args.files_command == "delete":
             for file_id in args.ids:
-                gpt.delete_file(file_id)
+                files_api.delete_file(file_id)
         elif args.files_command == "purge":
-            for file_id, *_ in gpt.list_files():
-                gpt.delete_file(file_id)
+            for file_id, *_ in files_api.list_files():
+                files_api.delete_file(file_id)
         else:
             files_parser.print_help()
         return
 
     if args.command == "vectors":
-        core.load_key()
-        gpt = core.GptCore(None, None, None)
+        vectors_api = Vectors()
         if args.vectors_command == "list":
-            stores = gpt.list_vector_stores()
+            stores = vectors_api.list_vector_stores()
             if not stores:
                 return
             rows = [
@@ -306,21 +308,23 @@ def main():
             ]
             print_table(("ID", "NAME", "STATUS", "CREATED_AT"), rows)
         elif args.vectors_command == "create":
-            vs_id = gpt.create_vector_store(args.name)
-            for path in args.files:
-                file_id = gpt.upload_file(path, "assistants")
-                gpt.add_vector_store_file(vs_id, file_id)
+            vs_id = vectors_api.create_vector_store(args.name)
+            if args.files:
+                files_api = Files(vectors_api.client)
+                for path in args.files:
+                    file_id = files_api.upload_file(path, "assistants")
+                    vectors_api.add_vector_store_file(vs_id, file_id)
             if args.files and not args.no_wait:
-                gpt.wait_for_vector_store(vs_id)
+                vectors_api.wait_for_vector_store(vs_id)
             print(vs_id)
         elif args.vectors_command == "delete":
-            gpt.delete_vector_store(args.id)
+            vectors_api.delete_vector_store(args.id)
         elif args.vectors_command == "purge":
-            for vsid, *_ in gpt.list_vector_stores():
-                gpt.delete_vector_store(vsid)
+            for vsid, *_ in vectors_api.list_vector_stores():
+                vectors_api.delete_vector_store(vsid)
         elif args.vectors_command == "files":
             if args.vectors_files_command == "list":
-                files = gpt.list_vector_store_files(args.id)
+                files = vectors_api.list_vector_store_files(args.id)
                 if not files:
                     return
                 rows = [
@@ -329,19 +333,21 @@ def main():
                 ]
                 print_table(("ID", "STATUS", "CREATED_AT"), rows)
             elif args.vectors_files_command == "add":
-                for path in args.files:
-                    file_id = gpt.upload_file(path, "assistants")
-                    gpt.add_vector_store_file(args.id, file_id)
+                if args.files:
+                    files_api = Files(vectors_api.client)
+                    for path in args.files:
+                        file_id = files_api.upload_file(path, "assistants")
+                        vectors_api.add_vector_store_file(args.id, file_id)
                 if not args.no_wait:
-                    gpt.wait_for_vector_store(args.id)
+                    vectors_api.wait_for_vector_store(args.id)
             elif args.vectors_files_command == "add-id":
                 for file_id in args.file_ids:
-                    gpt.add_vector_store_file(args.id, file_id)
+                    vectors_api.add_vector_store_file(args.id, file_id)
                 if not args.no_wait:
-                    gpt.wait_for_vector_store(args.id)
+                    vectors_api.wait_for_vector_store(args.id)
             elif args.vectors_files_command == "delete":
                 for file_id in args.file_ids:
-                    gpt.delete_vector_store_file(args.id, file_id)
+                    vectors_api.delete_vector_store_file(args.id, file_id)
             else:
                 vectors_files_parser.print_help()
         else:
@@ -353,7 +359,7 @@ def main():
         any(list_opts)
         and (
             args.multiline
-            or args.model != core.DEFAULT_MODEL
+            or args.model != DEFAULT_MODEL
             or args.batch_mode
             or args.prepend
             or args.prepend_file
@@ -372,14 +378,12 @@ def main():
         )
 
     if args.list_known:
-        for m in core.KNOWN_MODELS:
+        for m in KNOWN_MODELS:
             print(m)
         return
 
-    core.load_key()
-
     if args.list_all:
-        all_models = core.GptCore(None, None, None).list_models()
+        all_models = core.GptCore().list_models()
         for m in all_models:
             print(m)
         return

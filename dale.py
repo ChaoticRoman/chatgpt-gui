@@ -6,15 +6,10 @@ import random
 import string
 import time
 
-from openai import OpenAI
-
-from core import load_key
-
-load_key()
-client = OpenAI()
+from libopenai.auth import initialize_client
 
 
-def generate(prompt):
+def generate(client, prompt):
     response = client.images.generate(
         model="dall-e-3",
         prompt=prompt,
@@ -53,12 +48,14 @@ def main():
     args = parser.parse_args()
 
     prompts = [args.prompt] * args.amount
+    client = initialize_client()
+
     if args.jobs > 1:
         with multiprocessing.Pool(args.jobs) as pool:
-            pool.map(generate, prompts)
+            pool.map(lambda prompt: generate(client, prompt), prompts)
     else:
-        for p in prompts:
-            generate(p)
+        for prompt in prompts:
+            generate(client, prompt)
 
 
 if __name__ == "__main__":

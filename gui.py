@@ -23,10 +23,7 @@ from tkinterweb import HtmlFrame
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
-from libopenai.core import (
-    GptCore,
-    load_key
-)
+from libopenai.core import GptCore
 from libopenai.constants import (
     DATA_DIRECTORY,
     DEFAULT_MODEL,
@@ -36,8 +33,6 @@ from libopenai.constants import (
 from libopenai.pricing import KNOWN_MODELS
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
-
-load_key()
 
 
 class JsonViewerApp(tk.Tk):

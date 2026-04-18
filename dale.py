@@ -8,9 +8,9 @@ import time
 
 from openai import OpenAI
 
-from core import load_key
+from libopenai.auth import ensure_key
 
-load_key()
+ensure_key()
 client = OpenAI()
 
 

@@ -13,10 +13,9 @@ import time
 
 from openai import OpenAI
 
-from core import load_key
+from libopenai.auth import ensure_key
 
-# Basic client setup
-load_key()
+ensure_key()
 client = OpenAI()
 
 # Create vector store

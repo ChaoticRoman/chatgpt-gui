@@ -12,13 +12,7 @@ import openai
 
 from .pricing import USD_PER_TOKEN, USD_PER_WEB_SEARCH_CALL
 from .constants import DEFAULT_MODEL, DATA_DIRECTORY
-
-
-def load_key():
-    if "OPENAI_API_KEY" not in os.environ:
-        api_key_path = os.path.join(os.path.dirname(__file__), "..", ".api_key")
-        with open(api_key_path, "r") as f:
-            os.environ["OPENAI_API_KEY"] = f.read().strip()
+from .auth import ensure_key
 
 
 def _extract_sources(response):
@@ -88,6 +82,7 @@ class GptCore:
 
         self.save_callback = None
 
+        ensure_key()
         self.client = openai.OpenAI()
 
     def _compute_price(self, input_tokens, output_tokens, web_search_calls=0):

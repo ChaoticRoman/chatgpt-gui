@@ -2,11 +2,11 @@
 import openai
 import sys
 
-import core
+from libopenai.auth import ensure_key
 
-MODEL = "gpt-5.3-codex"
+MODEL = "gpt-5.4"
 
-core.load_key()
+ensure_key()
 client = openai.OpenAI()
 
 prompt = " ".join(sys.argv[1:])

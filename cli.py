@@ -266,7 +266,6 @@ def main():
     args = parser.parse_args()
 
     if args.command == "files":
-        core.load_key()
         gpt = core.GptCore()
         if args.files_command == "list":
             files = gpt.list_files()
@@ -296,7 +295,6 @@ def main():
         return
 
     if args.command == "vectors":
-        core.load_key()
         gpt = core.GptCore()
         if args.vectors_command == "list":
             stores = gpt.list_vector_stores()
@@ -377,8 +375,6 @@ def main():
         for m in KNOWN_MODELS:
             print(m)
         return
-
-    core.load_key()
 
     if args.list_all:
         all_models = core.GptCore().list_models()

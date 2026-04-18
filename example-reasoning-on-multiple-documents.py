@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 from openai import OpenAI
 
-from core import load_key
+from libopenai.auth import ensure_key
 
-load_key()
-
+ensure_key()
 client = OpenAI()
 
 # Upload

@@ -3,9 +3,9 @@ import sys
 
 from openai import OpenAI
 
-from core import load_key
+from libopenai.auth import ensure_key
 
-load_key()
+ensure_key()
 client = OpenAI()
 
 with open(sys.argv[1], "rb") as audio_file:

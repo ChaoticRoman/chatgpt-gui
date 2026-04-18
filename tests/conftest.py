@@ -1,6 +1,6 @@
 import pytest
 
-import core
+import libopenai.constants
 
 
 @pytest.fixture(autouse=True)
@@ -13,5 +13,5 @@ def isolated_data_dir(tmp_path, monkeypatch):
     Both are restored automatically after each test.
     """
     monkeypatch.setenv("CHATGPT_GUI_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(core, "DATA_DIRECTORY", tmp_path)
+    monkeypatch.setattr(libopenai.constants, "DATA_DIRECTORY", tmp_path)
     yield

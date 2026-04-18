@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-from openai import OpenAI
+from libopenai.auth import initialize_client
 
-from libopenai.auth import ensure_key
-
-ensure_key()
-client = OpenAI()
+client = initialize_client()
 
 # Upload
 apple = client.files.create(

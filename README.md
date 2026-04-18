@@ -23,7 +23,8 @@ pip install openai tkinterweb mistletoe pygments
 ### API Key
 
 Expects an `OPENAI_API_KEY` environment variable, or a `.api_key` file in the repo
-directory as a fallback. The filename is in `.gitignore` already.
+directory or data directory (`~/.chatgpt-gui/`) as a fallback. The filename is in
+`.gitignore` already.
 
 Conversations are automatically saved as JSON files in `~/.chatgpt-gui/`. Override the
 location with the `CHATGPT_GUI_DATA_DIR` environment variable:

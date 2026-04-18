@@ -6,7 +6,13 @@ Read README.md.
 
 Python CLI and GUI clients for OpenAI's ChatGPT. Key files:
 
-- `core.py` — shared library: `GptCore` class, pricing dicts, `Info` dataclass
+- `libopenai/` — shared library package:
+  - `core.py` — `GptCore` class, `Info` dataclass
+  - `auth.py` — API key loading and client initialization
+  - `constants.py` — `DEFAULT_MODEL`, file extensions, `DATA_DIRECTORY`
+  - `pricing.py` — `Pricing` dataclass, per-model pricing dict, `KNOWN_MODELS`
+  - `files.py` — `Files` class (upload, list, delete)
+  - `vectors.py` — `Vectors` class (vector store CRUD)
 - `cli.py` — CLI client with interactive, batch, multiline, web-search, debug modes
 - `gui.py` — Tkinter GUI client with conversation browser
 
@@ -42,12 +48,12 @@ Tests live in `tests/`. The test suite (`tests/e2e_test.py`) calls the **real Op
 
 ## Architecture principles
 
-### `core.py` is client-agnostic
+### `libopenai/` is client-agnostic
 
-`core.py` is a reusable library. It must not reference or special-case any specific caller. New clients (web frontends, backend libraries, …) will be added over time.
+`libopenai/` is a reusable library package. It must not reference or special-case any specific caller. New clients (web frontends, backend libraries, …) will be added over time.
 
 Follow **SOLID**, especially:
-- **Single Responsibility** — `core.py` handles AI interaction only. I/O, presentation, and session management belong to the caller.
+- **Single Responsibility** — `libopenai/` handles AI interaction only. I/O, presentation, and session management belong to the caller.
 - **Open/Closed** — extend behaviour through the defined callback and slot protocol; never add branches that check which kind of caller is in use.
 
 ### Caller protocol for `main()` and `one_shot()`
@@ -69,8 +75,8 @@ An event-driven caller sets them on the instance before signalling `input()` to 
 
 ## Code conventions
 
-- No `pyproject.toml` or `setup.py` — this is a flat script-based repo, not a package.
-- Imports: stdlib first, then third-party (`openai`, `rich`, etc.), then local (`core`). Ruff enforces this.
+- No `pyproject.toml` or `setup.py` — the shared library lives in `libopenai/`; callers are flat scripts.
+- Imports: stdlib first, then third-party (`openai`, `rich`, etc.), then local (`libopenai`). Ruff enforces this.
 - `GptCore` uses an input/output callback pattern — `input()` returns a string or `None`, `output(msg, info)` displays results.
 
 ## When adding a new CLI flag
@@ -100,7 +106,7 @@ You may be running in a git worktree (e.g. `.claude/worktrees/...`). Your cwd is
 ## Things to avoid
 
 - Don't add type stubs, docstrings, or comments to code you didn't change.
-- Don't restructure into a package — the flat layout is intentional.
+- Keep `libopenai/` as the shared library package; callers remain flat scripts.
 - Don't add dependencies without strong justification.
 - Don't run `make test` for changes that don't touch core logic — it costs real money.
 - Don't modify `tests/conftest.py` cleanup logic without understanding side effects.

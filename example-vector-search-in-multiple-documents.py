@@ -11,12 +11,9 @@ then cleans up the vector store and uploaded files.
 import os
 import time
 
-from openai import OpenAI
+from libopenai.auth import initialize_client
 
-from libopenai.auth import ensure_key
-
-ensure_key()
-client = OpenAI()
+client = initialize_client()
 
 # Create vector store
 

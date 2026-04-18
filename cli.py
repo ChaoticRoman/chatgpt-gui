@@ -10,7 +10,9 @@ import readline  # noqa F401
 from rich.console import Console
 from rich.markdown import Markdown
 
-import core
+from libopenai import core
+from libopenai.pricing import KNOWN_MODELS
+from libopenai.constants import DEFAULT_MODEL
 
 console = Console()
 
@@ -184,8 +186,8 @@ def main():
     parser.add_argument(
         "-M",
         "--model",
-        default=core.DEFAULT_MODEL,
-        help=f"Use different model than {core.DEFAULT_MODEL}",
+        default=DEFAULT_MODEL,
+        help=f"Use different model than {DEFAULT_MODEL}",
     )
     parser.add_argument(
         "-b",
@@ -265,7 +267,7 @@ def main():
 
     if args.command == "files":
         core.load_key()
-        gpt = core.GptCore(None, None, None)
+        gpt = core.GptCore()
         if args.files_command == "list":
             files = gpt.list_files()
             if not files:
@@ -295,7 +297,7 @@ def main():
 
     if args.command == "vectors":
         core.load_key()
-        gpt = core.GptCore(None, None, None)
+        gpt = core.GptCore()
         if args.vectors_command == "list":
             stores = gpt.list_vector_stores()
             if not stores:
@@ -353,7 +355,7 @@ def main():
         any(list_opts)
         and (
             args.multiline
-            or args.model != core.DEFAULT_MODEL
+            or args.model != DEFAULT_MODEL
             or args.batch_mode
             or args.prepend
             or args.prepend_file
@@ -372,14 +374,14 @@ def main():
         )
 
     if args.list_known:
-        for m in core.KNOWN_MODELS:
+        for m in KNOWN_MODELS:
             print(m)
         return
 
     core.load_key()
 
     if args.list_all:
-        all_models = core.GptCore(None, None, None).list_models()
+        all_models = core.GptCore().list_models()
         for m in all_models:
             print(m)
         return

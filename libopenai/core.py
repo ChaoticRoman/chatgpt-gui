@@ -10,72 +10,13 @@ from pprint import pprint
 
 import openai
 
-DEFAULT_MODEL = "gpt-5.4"
-
-IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
-USER_DATA_EXTENSIONS = (
-    ".csv",
-    ".doc",
-    ".docx",
-    ".html",
-    ".json",
-    ".md",
-    ".odt",
-    ".pdf",
-    ".ppt",
-    ".pptx",
-    ".rtf",
-    ".txt",
-    ".xls",
-    ".xlsx",
-    ".xml",
-)
-
-# Prices in USD, source: https://openai.com/api/pricing/
-USD_PER_INPUT_TOKEN = {
-    "o1": 15e-6,
-    "o3-pro": 20e-6,
-    "o3-mini": 1.1e-6,
-    "o4-mini": 1.1e-6,
-    "gpt-5": 1.25e-6,
-    "gpt-5.1": 1.25e-6,
-    "gpt-5.2": 1.75e-6,
-    "gpt-5.2-codex": 1.75e-6,
-    "gpt-5.3-codex": 1.75e-6,
-    "gpt-5.4-nano": 0.2e-6,
-    "gpt-5.4-mini": 0.75e-6,
-    "gpt-5.4": 2.5e-6,
-    "gpt-5.4-pro": 30e-6,
-}
-USD_PER_OUTPUT_TOKEN = {
-    "o1": 60e-6,
-    "o3-pro": 80e-6,
-    "o3-mini": 4.4e-6,
-    "o4-mini": 4.4e-6,
-    "gpt-5": 10e-6,
-    "gpt-5.1": 10e-6,
-    "gpt-5.2": 14e-6,
-    "gpt-5.2-codex": 14e-6,
-    "gpt-5.3-codex": 14e-6,
-    "gpt-5.4-nano": 1.25e-6,
-    "gpt-5.4-mini": 4.5e-6,
-    "gpt-5.4": 15e-6,
-    "gpt-5.4-pro": 180e-6,
-}
-assert set(USD_PER_INPUT_TOKEN.keys()) == set(USD_PER_OUTPUT_TOKEN.keys())
-
-KNOWN_MODELS = sorted(USD_PER_INPUT_TOKEN.keys())
-
-USD_PER_WEB_SEARCH_CALL = 0.01
-
-DATA_DIRECTORY = Path(
-    os.environ.get("CHATGPT_GUI_DATA_DIR", Path.home() / ".chatgpt-gui")
-).expanduser()
+from .pricing import USD_PER_TOKEN, USD_PER_WEB_SEARCH_CALL
+from .constants import DEFAULT_MODEL, DATA_DIRECTORY
 
 
 def load_key():
     if "OPENAI_API_KEY" not in os.environ:
-        api_key_path = os.path.join(os.path.dirname(__file__), ".api_key")
+        api_key_path = os.path.join(os.path.dirname(__file__), "..", ".api_key")
         with open(api_key_path, "r") as f:
             os.environ["OPENAI_API_KEY"] = f.read().strip()
 
@@ -150,10 +91,10 @@ class GptCore:
         self.client = openai.OpenAI()
 
     def _compute_price(self, input_tokens, output_tokens, web_search_calls=0):
-        if self.model in USD_PER_INPUT_TOKEN and self.model in USD_PER_OUTPUT_TOKEN:
+        if self.model in USD_PER_TOKEN:
             return (
-                USD_PER_INPUT_TOKEN[self.model] * input_tokens
-                + USD_PER_OUTPUT_TOKEN[self.model] * output_tokens
+                USD_PER_TOKEN[self.model].input * input_tokens
+                + USD_PER_TOKEN[self.model].output * output_tokens
                 + USD_PER_WEB_SEARCH_CALL * web_search_calls
             )
         return None

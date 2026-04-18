@@ -23,15 +23,17 @@ from tkinterweb import HtmlFrame
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
-from core import (
+from libopenai.core import (
     GptCore,
-    load_key,
+    load_key
+)
+from libopenai.constants import (
     DATA_DIRECTORY,
     DEFAULT_MODEL,
-    KNOWN_MODELS,
     IMAGE_EXTENSIONS,
     USER_DATA_EXTENSIONS,
 )
+from libopenai.pricing import KNOWN_MODELS
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
 

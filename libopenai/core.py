@@ -13,6 +13,16 @@ from .constants import DEFAULT_MODEL, DATA_DIRECTORY
 from .auth import initialize_client
 from .files import Files
 from .vectors import Vectors
+from .validation import (
+    IMAGE_FORMAT_DEFAULT,
+    IMAGE_MODEL_DEFAULT,
+    IMAGE_QUALITY_DEFAULT,
+    IMAGE_SIZE_DEFAULT,
+    validate_image_format,
+    validate_image_model,
+    validate_image_quality,
+    validate_image_size,
+)
 
 
 def _extract_sources(response):
@@ -61,6 +71,10 @@ class GptCore:
         model=DEFAULT_MODEL,
         web_search=False,
         image_generation=False,
+        image_size=IMAGE_SIZE_DEFAULT,
+        image_quality=IMAGE_QUALITY_DEFAULT,
+        image_format=IMAGE_FORMAT_DEFAULT,
+        image_model=IMAGE_MODEL_DEFAULT,
         debug=False,
         client=None,
     ):  # noqa: A002 (input is a callback, not the builtin)
@@ -69,6 +83,10 @@ class GptCore:
         self.model = model
         self.web_search = web_search
         self.image_generation = image_generation
+        self.image_size = validate_image_size(image_size)
+        self.image_quality = validate_image_quality(image_quality)
+        self.image_format = validate_image_format(image_format)
+        self.image_model = validate_image_model(image_model)
         self.debug = debug
 
         self.messages = []
@@ -156,7 +174,14 @@ class GptCore:
             tools.append({"type": "web_search"})
             includes.append("web_search_call.action.sources")
         if self.image_generation:
-            tools.append({"type": "image_generation", "model": "gpt-image-2"})
+            image_tool = {
+                "type": "image_generation",
+                "model": validate_image_model(self.image_model),
+                "size": validate_image_size(self.image_size),
+                "quality": validate_image_quality(self.image_quality),
+                "output_format": validate_image_format(self.image_format),
+            }
+            tools.append(image_tool)
         if self._vector_store_id:
             tools.append(
                 {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
@@ -184,7 +209,7 @@ class GptCore:
                     continue
                 path = (
                     self.file.parent
-                    / f"{self.file.stem}-{self.output_image_index:02d}.png"
+                    / f"{self.file.stem}-{self.output_image_index:02d}.{self.image_format}"
                 )
                 self.output_image_index += 1
                 with open(path, "wb") as f:

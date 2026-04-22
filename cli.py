@@ -15,6 +15,30 @@ from libopenai.pricing import KNOWN_MODELS
 from libopenai.constants import DEFAULT_MODEL
 from libopenai.files import Files
 from libopenai.vectors import Vectors
+from libopenai.validation import (
+    IMAGE_FORMAT_DEFAULT,
+    IMAGE_FORMATS,
+    IMAGE_MODEL_DEFAULT,
+    IMAGE_MODELS,
+    IMAGE_QUALITIES,
+    IMAGE_QUALITY_DEFAULT,
+    IMAGE_SIZE_DEFAULT,
+    validate_image_size,
+)
+
+
+def _argparse_type(validator):
+    """Wrap a validator so argparse shows its message instead of a generic one."""
+
+    def _wrapped(value):
+        try:
+            return validator(value)
+        except ValueError as e:
+            raise argparse.ArgumentTypeError(str(e)) from e
+
+    _wrapped.__name__ = validator.__name__
+    return _wrapped
+
 
 console = Console()
 
@@ -255,6 +279,34 @@ def main():
         help="Enable image generation tool. Generated images are saved to the data directory.",
     )
     parser.add_argument(
+        "--image-size",
+        type=_argparse_type(validate_image_size),
+        default=IMAGE_SIZE_DEFAULT,
+        metavar="SIZE",
+        help=(
+            f"Generated image size (auto or WIDTHxHEIGHT, e.g. 1024x1024). "
+            f"Default: {IMAGE_SIZE_DEFAULT}."
+        ),
+    )
+    parser.add_argument(
+        "--image-quality",
+        choices=IMAGE_QUALITIES,
+        default=IMAGE_QUALITY_DEFAULT,
+        help=f"Generated image quality. Default: {IMAGE_QUALITY_DEFAULT}.",
+    )
+    parser.add_argument(
+        "--image-format",
+        choices=IMAGE_FORMATS,
+        default=IMAGE_FORMAT_DEFAULT,
+        help=f"Generated image format. Default: {IMAGE_FORMAT_DEFAULT}.",
+    )
+    parser.add_argument(
+        "--image-model",
+        choices=IMAGE_MODELS,
+        default=IMAGE_MODEL_DEFAULT,
+        help=f"Image generation model. Default: {IMAGE_MODEL_DEFAULT}.",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -377,6 +429,10 @@ def main():
             or args.rich
             or args.web_search
             or args.image_generation
+            or args.image_size != IMAGE_SIZE_DEFAULT
+            or args.image_quality != IMAGE_QUALITY_DEFAULT
+            or args.image_format != IMAGE_FORMAT_DEFAULT
+            or args.image_model != IMAGE_MODEL_DEFAULT
             or args.debug
         )
     ) or sum(list_opts) > 1:
@@ -419,6 +475,10 @@ def main():
             args.model,
             web_search=args.web_search,
             image_generation=args.image_generation,
+            image_size=args.image_size,
+            image_quality=args.image_quality,
+            image_format=args.image_format,
+            image_model=args.image_model,
             debug=args.debug,
         ).main(
             image_paths=args.image,
@@ -467,6 +527,10 @@ def main():
         model=args.model,
         web_search=args.web_search,
         image_generation=args.image_generation,
+        image_size=args.image_size,
+        image_quality=args.image_quality,
+        image_format=args.image_format,
+        image_model=args.image_model,
         debug=args.debug,
     ).main(
         image_paths=args.image,

@@ -354,6 +354,70 @@ class TestImageInput:
         assert "tag" in responses[1]
         assert_files_cleaned_up(stderr)
 
+    def test_multiple_images(self):
+        """-i accepts multiple files; all uploaded and cleaned up."""
+        stdout, stderr, rc = run_cli(
+            "Reply just ok.",
+            extra_args=["-b", "-i", "tests/test.png", "tests/test.png"],
+            extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
+        )
+        assert rc == 0
+        uploaded = parse_uploaded_ids(stderr)
+        assert len(uploaded) == 2, f"Expected 2 uploaded files, got: {uploaded}"
+        assert_files_cleaned_up(stderr)
+
+
+class TestImageGeneration:
+    """Test -ig/--image-generation. One API call only — relies on the cheap defaults
+    (gpt-image-1-mini, low quality, smallest size, jpeg)."""
+
+    def test_image_generation_saves_file(self, tmp_path):
+        """-ig produces an image on disk and embeds its path in the reply."""
+        stdout, stderr, rc = run_cli(
+            "Generate a plain solid red square. No text.",
+            extra_args=["-b", "-ig"],
+            timeout=240,
+        )
+        assert rc == 0
+        generated = list(tmp_path.glob("*-00.jpeg"))
+        assert len(generated) == 1, f"Expected 1 generated JPEG, got: {generated}"
+        assert generated[0].stat().st_size > 0
+        # The image path must be embedded in the markdown reply.
+        assert str(generated[0]) in stdout
+
+    def test_invalid_image_size(self):
+        """--image-size with bad geometry rejected by argparse, no API call."""
+        _, stderr, rc = run_cli(
+            "",
+            extra_args=["-b", "--image-size", "99x99"],
+            model=None,
+            timeout=10,
+        )
+        assert rc == 2
+        assert "invalid size" in stderr
+
+    def test_invalid_image_quality(self):
+        """--image-quality with unknown value rejected by argparse, no API call."""
+        _, stderr, rc = run_cli(
+            "",
+            extra_args=["-b", "--image-quality", "ultra"],
+            model=None,
+            timeout=10,
+        )
+        assert rc == 2
+        assert "invalid choice" in stderr
+
+    def test_invalid_image_format(self):
+        """--image-format with unknown value rejected by argparse, no API call."""
+        _, stderr, rc = run_cli(
+            "",
+            extra_args=["-b", "--image-format", "bmp"],
+            model=None,
+            timeout=10,
+        )
+        assert rc == 2
+        assert "invalid choice" in stderr
+
 
 class TestFileInput:
     """Test PDF document input."""

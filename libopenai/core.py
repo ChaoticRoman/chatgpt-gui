@@ -1,3 +1,4 @@
+import base64
 import os
 import uuid
 from dataclasses import dataclass
@@ -59,6 +60,7 @@ class GptCore:
         output=None,
         model=DEFAULT_MODEL,
         web_search=False,
+        image_generation=False,
         debug=False,
         client=None,
     ):  # noqa: A002 (input is a callback, not the builtin)
@@ -66,6 +68,7 @@ class GptCore:
         self.output = output
         self.model = model
         self.web_search = web_search
+        self.image_generation = image_generation
         self.debug = debug
 
         self.messages = []
@@ -74,6 +77,7 @@ class GptCore:
         self._vector_store_id = None
         self._vector_store_owned = False
         self._vector_files = []
+        self.output_image_index = 0
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
         self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"
@@ -150,6 +154,8 @@ class GptCore:
         if self.web_search:
             tools.append({"type": "web_search"})
             includes.append("web_search_call.action.sources")
+        if self.image_generation:
+            tools.append({"type": "image_generation"})
         if self._vector_store_id:
             tools.append(
                 {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
@@ -167,6 +173,24 @@ class GptCore:
             pprint(response.to_dict(), stream=sys.stderr)
 
         content = (response.output_text or "").strip()
+
+        if self.image_generation:
+            for item in response.output:
+                if getattr(item, "type", None) != "image_generation_call":
+                    continue
+                b64 = getattr(item, "result", None)
+                if not b64:
+                    continue
+                path = (
+                    self.file.parent
+                    / f"{self.file.stem}-{self.output_image_index:02d}.png"
+                )
+                self.output_image_index += 1
+                with open(path, "wb") as f:
+                    f.write(base64.b64decode(b64))
+                img_md = f"```\n{path}\n```\n![]({path})"
+                content = f"{content}\n\n{img_md}" if content else img_md
+
         self.messages.append({"role": "assistant", "content": content})
 
         if self.web_search:

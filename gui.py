@@ -194,13 +194,21 @@ class JsonViewerApp(tk.Tk):
         )
         self.send_button.pack(side=tk.TOP, fill=tk.X)
 
-        ws_row = tk.Frame(attachments_panel)
-        ws_row.pack(side=tk.TOP, fill=tk.X)
+        tools_row = tk.Frame(attachments_panel)
+        tools_row.pack(side=tk.TOP, fill=tk.X)
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
-            ws_row, text="Web search", variable=self.web_search_var
+            tools_row, text="Web search", variable=self.web_search_var
         )
         self.web_search_check.pack(side=tk.LEFT, anchor="w")
+        self.image_generation_var = tk.BooleanVar(value=False)
+        self.image_generation_check = tk.Checkbutton(
+            tools_row, text="Image generation", variable=self.image_generation_var
+        )
+        self.image_generation_check.pack(side=tk.LEFT, anchor="w")
+
+        ws_row = tk.Frame(attachments_panel)
+        ws_row.pack(side=tk.TOP, fill=tk.X)
         Button(ws_row, text="⏵📋", command=self._copy_settings, padx=2, pady=0).pack(
             side=tk.LEFT, fill=tk.X, expand=True
         )
@@ -313,6 +321,7 @@ class JsonViewerApp(tk.Tk):
                 "model": self.model_var.get(),
                 "vs": self.vs_var.get(),
                 "web_search": self.web_search_var.get(),
+                "image_generation": self.image_generation_var.get(),
             }
 
     def _restore_draft(self, file_path):
@@ -329,6 +338,7 @@ class JsonViewerApp(tk.Tk):
         if vs := draft.get("vs"):
             self.vs_var.set(vs)
         self.web_search_var.set(draft.get("web_search", False))
+        self.image_generation_var.set(draft.get("image_generation", False))
 
     def on_file_select(self, event):
         """Display the content of the selected JSON file."""
@@ -547,6 +557,7 @@ class JsonViewerApp(tk.Tk):
         self.input_text.delete("1.0", END)
         self.gpt_core.model = self.model_var.get()
         self.gpt_core.web_search = self.web_search_var.get()
+        self.gpt_core.image_generation = self.image_generation_var.get()
         vs_display = self.vs_var.get()
         if vs_display == TEMPORARY_VECTOR_STORE:
             if not self.gpt_core._vector_store_owned:
@@ -621,6 +632,7 @@ class JsonViewerApp(tk.Tk):
             "attachments": list(self._attachment_data.values()),
             "vs": self.vs_var.get(),
             "web_search": self.web_search_var.get(),
+            "image_generation": self.image_generation_var.get(),
             "model": self.model_var.get(),
         }
         self.paste_settings_btn.config(state="normal")
@@ -633,6 +645,9 @@ class JsonViewerApp(tk.Tk):
             self._insert_attachment(full_path, purpose)
         self.vs_var.set(self._settings_clipboard["vs"])
         self.web_search_var.set(self._settings_clipboard["web_search"])
+        self.image_generation_var.set(
+            self._settings_clipboard.get("image_generation", False)
+        )
         if "model" in self._settings_clipboard:
             self.model_var.set(self._settings_clipboard["model"])
 

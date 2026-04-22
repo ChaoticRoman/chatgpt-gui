@@ -248,6 +248,12 @@ def main():
         help="Enable web search tool.",
     )
     parser.add_argument(
+        "-ig",
+        "--image-generation",
+        action="store_true",
+        help="Enable image generation tool. Generated images are saved to the data directory.",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -369,6 +375,7 @@ def main():
             or args.vector_store
             or args.rich
             or args.web_search
+            or args.image_generation
             or args.debug
         )
     ) or sum(list_opts) > 1:
@@ -410,6 +417,7 @@ def main():
             batch_output,
             args.model,
             web_search=args.web_search,
+            image_generation=args.image_generation,
             debug=args.debug,
         ).main(
             image_path=args.image,
@@ -457,6 +465,7 @@ def main():
         output_f,
         model=args.model,
         web_search=args.web_search,
+        image_generation=args.image_generation,
         debug=args.debug,
     ).main(
         image_path=args.image,

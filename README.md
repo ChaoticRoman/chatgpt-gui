@@ -49,6 +49,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection |
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
+| `-ig`, `--image-generation` | Enable image generation; images saved to the data directory |
 | `-p`, `--prepend` | Prepend a string (followed by two newlines) to the first message |
 | `-pf`, `--prepend-file` | Prepend a file's contents to the first message |
 | `-i`, `--image` | Image file to include |

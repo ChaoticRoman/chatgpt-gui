@@ -49,9 +49,14 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-b`, `--batch-mode` | Non-interactive mode for pipes and redirection |
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
+| `-ig`, `--image-generation` | Enable image generation; images saved to the data directory |
+| `--image-size` | Generated image size (`auto` or `WIDTHxHEIGHT`, e.g. `1024x1024`); default `1024x1024` |
+| `--image-quality` | Generated image quality: `auto`, `low`, `medium`, `high`; default `low` |
+| `--image-format` | Generated image format: `png`, `jpeg`, `webp`; default `jpeg` |
+| `--image-model` | Image generation model: `gpt-image-2`, `gpt-image-1.5`, `gpt-image-1`, `gpt-image-1-mini`; default `gpt-image-1-mini` |
 | `-p`, `--prepend` | Prepend a string (followed by two newlines) to the first message |
 | `-pf`, `--prepend-file` | Prepend a file's contents to the first message |
-| `-i`, `--image` | Image file to include |
+| `-i`, `--image` | Image file(s) to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
 | `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search; can be combined with `-vf` to upload additional files into it (files are kept after the session) |

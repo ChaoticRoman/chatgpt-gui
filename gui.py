@@ -33,6 +33,20 @@ from libopenai.constants import (
     USER_DATA_EXTENSIONS,
 )
 from libopenai.pricing import KNOWN_MODELS
+from libopenai.validation import (
+    IMAGE_FORMAT_DEFAULT,
+    IMAGE_FORMATS,
+    IMAGE_MODEL_DEFAULT,
+    IMAGE_MODELS,
+    IMAGE_QUALITIES,
+    IMAGE_QUALITY_DEFAULT,
+    IMAGE_SIZE_DEFAULT,
+    IMAGE_SIZE_PRESETS,
+    validate_image_format,
+    validate_image_model,
+    validate_image_quality,
+    validate_image_size,
+)
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
 
@@ -194,13 +208,72 @@ class JsonViewerApp(tk.Tk):
         )
         self.send_button.pack(side=tk.TOP, fill=tk.X)
 
-        ws_row = tk.Frame(attachments_panel)
-        ws_row.pack(side=tk.TOP, fill=tk.X)
+        tools_row = tk.Frame(attachments_panel)
+        tools_row.pack(side=tk.TOP, fill=tk.X)
         self.web_search_var = tk.BooleanVar(value=False)
         self.web_search_check = tk.Checkbutton(
-            ws_row, text="Web search", variable=self.web_search_var
+            tools_row, text="Web search", variable=self.web_search_var
         )
         self.web_search_check.pack(side=tk.LEFT, anchor="w")
+        self.image_generation_var = tk.BooleanVar(value=False)
+        self.image_generation_check = tk.Checkbutton(
+            tools_row, text="Image generation", variable=self.image_generation_var
+        )
+        self.image_generation_check.pack(side=tk.LEFT, anchor="w")
+
+        img_model_row = tk.Frame(attachments_panel)
+        img_model_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(img_model_row, text="Image model:").pack(side=LEFT)
+        self.image_model_var = tk.StringVar(value=IMAGE_MODEL_DEFAULT)
+        self.image_model_combo = ttk.Combobox(
+            img_model_row,
+            textvariable=self.image_model_var,
+            values=IMAGE_MODELS,
+            state="readonly",
+            width=10,
+        )
+        self.image_model_combo.pack(side=LEFT, fill=tk.X, expand=True)
+
+        img_size_row = tk.Frame(attachments_panel)
+        img_size_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(img_size_row, text="Image size:").pack(side=LEFT)
+        self.image_size_var = tk.StringVar(value=IMAGE_SIZE_DEFAULT)
+        self.image_size_combo = ttk.Combobox(
+            img_size_row,
+            textvariable=self.image_size_var,
+            values=IMAGE_SIZE_PRESETS,
+            width=10,
+        )
+        self.image_size_combo.pack(side=LEFT, fill=tk.X, expand=True)
+
+        img_quality_row = tk.Frame(attachments_panel)
+        img_quality_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(img_quality_row, text="Image quality:").pack(side=LEFT)
+        self.image_quality_var = tk.StringVar(value=IMAGE_QUALITY_DEFAULT)
+        self.image_quality_combo = ttk.Combobox(
+            img_quality_row,
+            textvariable=self.image_quality_var,
+            values=IMAGE_QUALITIES,
+            state="readonly",
+            width=10,
+        )
+        self.image_quality_combo.pack(side=LEFT, fill=tk.X, expand=True)
+
+        img_format_row = tk.Frame(attachments_panel)
+        img_format_row.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(img_format_row, text="Image format:").pack(side=LEFT)
+        self.image_format_var = tk.StringVar(value=IMAGE_FORMAT_DEFAULT)
+        self.image_format_combo = ttk.Combobox(
+            img_format_row,
+            textvariable=self.image_format_var,
+            values=IMAGE_FORMATS,
+            state="readonly",
+            width=10,
+        )
+        self.image_format_combo.pack(side=LEFT, fill=tk.X, expand=True)
+
+        ws_row = tk.Frame(attachments_panel)
+        ws_row.pack(side=tk.TOP, fill=tk.X)
         Button(ws_row, text="⏵📋", command=self._copy_settings, padx=2, pady=0).pack(
             side=tk.LEFT, fill=tk.X, expand=True
         )
@@ -313,6 +386,11 @@ class JsonViewerApp(tk.Tk):
                 "model": self.model_var.get(),
                 "vs": self.vs_var.get(),
                 "web_search": self.web_search_var.get(),
+                "image_generation": self.image_generation_var.get(),
+                "image_size": self.image_size_var.get(),
+                "image_quality": self.image_quality_var.get(),
+                "image_format": self.image_format_var.get(),
+                "image_model": self.image_model_var.get(),
             }
 
     def _restore_draft(self, file_path):
@@ -329,6 +407,11 @@ class JsonViewerApp(tk.Tk):
         if vs := draft.get("vs"):
             self.vs_var.set(vs)
         self.web_search_var.set(draft.get("web_search", False))
+        self.image_generation_var.set(draft.get("image_generation", False))
+        self.image_size_var.set(draft.get("image_size", IMAGE_SIZE_DEFAULT))
+        self.image_quality_var.set(draft.get("image_quality", IMAGE_QUALITY_DEFAULT))
+        self.image_format_var.set(draft.get("image_format", IMAGE_FORMAT_DEFAULT))
+        self.image_model_var.set(draft.get("image_model", IMAGE_MODEL_DEFAULT))
 
     def on_file_select(self, event):
         """Display the content of the selected JSON file."""
@@ -524,19 +607,28 @@ class JsonViewerApp(tk.Tk):
         if not user_message:
             return
 
+        try:
+            image_size = validate_image_size(self.image_size_var.get())
+            image_quality = validate_image_quality(self.image_quality_var.get())
+            image_format = validate_image_format(self.image_format_var.get())
+            image_model = validate_image_model(self.image_model_var.get())
+        except ValueError as e:
+            self.status_bar.config(text=str(e))
+            return
+
         # Populate the core's attachment slots before unblocking input().
         # The background thread is blocked on queue.get() so writes are safe.
-        image_path, file_paths, vectorize_paths = None, [], []
+        image_paths, file_paths, vectorize_paths = [], [], []
         for iid in self.att_tree.get_children():
             path, purpose = self._attachment_data[iid]
             if purpose == "vision":
-                image_path = path
+                image_paths.append(path)
             elif purpose == "user_data":
                 file_paths.append(path)
             elif purpose == "assistants":
                 vectorize_paths.append(path)
         self._clear_attachment_list()
-        self.gpt_core._next_image_path = image_path
+        self.gpt_core._next_image_paths = image_paths or None
         self.gpt_core._next_file_paths = file_paths or None
         self.gpt_core._next_vectorize_paths = vectorize_paths or None
 
@@ -547,6 +639,11 @@ class JsonViewerApp(tk.Tk):
         self.input_text.delete("1.0", END)
         self.gpt_core.model = self.model_var.get()
         self.gpt_core.web_search = self.web_search_var.get()
+        self.gpt_core.image_generation = self.image_generation_var.get()
+        self.gpt_core.image_size = image_size
+        self.gpt_core.image_quality = image_quality
+        self.gpt_core.image_format = image_format
+        self.gpt_core.image_model = image_model
         vs_display = self.vs_var.get()
         if vs_display == TEMPORARY_VECTOR_STORE:
             if not self.gpt_core._vector_store_owned:
@@ -578,11 +675,6 @@ class JsonViewerApp(tk.Tk):
         for path in paths:
             ext = Path(path).suffix.lower()
             if ext in IMAGE_EXTENSIONS:
-                # Only one vision file allowed — replace any existing one
-                for iid in list(self.att_tree.get_children()):
-                    if self._attachment_data[iid][1] == "vision":
-                        del self._attachment_data[iid]
-                        self.att_tree.delete(iid)
                 self._insert_attachment(path, "vision")
             else:
                 self._insert_attachment(path, "user_data")
@@ -621,6 +713,11 @@ class JsonViewerApp(tk.Tk):
             "attachments": list(self._attachment_data.values()),
             "vs": self.vs_var.get(),
             "web_search": self.web_search_var.get(),
+            "image_generation": self.image_generation_var.get(),
+            "image_size": self.image_size_var.get(),
+            "image_quality": self.image_quality_var.get(),
+            "image_format": self.image_format_var.get(),
+            "image_model": self.image_model_var.get(),
             "model": self.model_var.get(),
         }
         self.paste_settings_btn.config(state="normal")
@@ -633,6 +730,21 @@ class JsonViewerApp(tk.Tk):
             self._insert_attachment(full_path, purpose)
         self.vs_var.set(self._settings_clipboard["vs"])
         self.web_search_var.set(self._settings_clipboard["web_search"])
+        self.image_generation_var.set(
+            self._settings_clipboard.get("image_generation", False)
+        )
+        self.image_size_var.set(
+            self._settings_clipboard.get("image_size", IMAGE_SIZE_DEFAULT)
+        )
+        self.image_quality_var.set(
+            self._settings_clipboard.get("image_quality", IMAGE_QUALITY_DEFAULT)
+        )
+        self.image_format_var.set(
+            self._settings_clipboard.get("image_format", IMAGE_FORMAT_DEFAULT)
+        )
+        self.image_model_var.set(
+            self._settings_clipboard.get("image_model", IMAGE_MODEL_DEFAULT)
+        )
         if "model" in self._settings_clipboard:
             self.model_var.set(self._settings_clipboard["model"])
 

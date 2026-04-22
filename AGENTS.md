@@ -66,7 +66,7 @@ Both methods drive a conversation through two instance callbacks:
 
 | Slot | Cleared after |
 |---|---|
-| `_next_image_path` | every `send()` |
+| `_next_image_paths` | every `send()` |
 | `_next_file_paths` | every `send()` |
 | `_next_vectorize_paths` | vector store creation |
 

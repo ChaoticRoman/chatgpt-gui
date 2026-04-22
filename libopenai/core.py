@@ -1,3 +1,4 @@
+import base64
 import os
 import uuid
 from dataclasses import dataclass
@@ -12,6 +13,16 @@ from .constants import DEFAULT_MODEL, DATA_DIRECTORY
 from .auth import initialize_client
 from .files import Files
 from .vectors import Vectors
+from .validation import (
+    IMAGE_FORMAT_DEFAULT,
+    IMAGE_MODEL_DEFAULT,
+    IMAGE_QUALITY_DEFAULT,
+    IMAGE_SIZE_DEFAULT,
+    validate_image_format,
+    validate_image_model,
+    validate_image_quality,
+    validate_image_size,
+)
 
 
 def _extract_sources(response):
@@ -59,6 +70,11 @@ class GptCore:
         output=None,
         model=DEFAULT_MODEL,
         web_search=False,
+        image_generation=False,
+        image_size=IMAGE_SIZE_DEFAULT,
+        image_quality=IMAGE_QUALITY_DEFAULT,
+        image_format=IMAGE_FORMAT_DEFAULT,
+        image_model=IMAGE_MODEL_DEFAULT,
         debug=False,
         client=None,
     ):  # noqa: A002 (input is a callback, not the builtin)
@@ -66,6 +82,11 @@ class GptCore:
         self.output = output
         self.model = model
         self.web_search = web_search
+        self.image_generation = image_generation
+        self.image_size = validate_image_size(image_size)
+        self.image_quality = validate_image_quality(image_quality)
+        self.image_format = validate_image_format(image_format)
+        self.image_model = validate_image_model(image_model)
         self.debug = debug
 
         self.messages = []
@@ -74,6 +95,8 @@ class GptCore:
         self._vector_store_id = None
         self._vector_store_owned = False
         self._vector_files = []
+        self._carryover_image_paths = []
+        self.output_image_index = 0
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
         self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"
@@ -128,12 +151,12 @@ class GptCore:
         if self.save_callback:
             self.save_callback()
 
-    def send(self, prompt, image_path=None, file_paths=None):
+    def send(self, prompt, image_paths=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
         content = []
-        if image_path:
-            name = Path(image_path).name
-            file_id = self.files_api.upload_file(image_path, "vision")
+        for path in image_paths or []:
+            name = Path(path).name
+            file_id = self.files_api.upload_file(path, "vision")
             self._images.append((name, file_id))
             content.append({"type": "input_image", "file_id": file_id})
         for path in file_paths or []:
@@ -150,6 +173,15 @@ class GptCore:
         if self.web_search:
             tools.append({"type": "web_search"})
             includes.append("web_search_call.action.sources")
+        if self.image_generation:
+            image_tool = {
+                "type": "image_generation",
+                "model": validate_image_model(self.image_model),
+                "size": validate_image_size(self.image_size),
+                "quality": validate_image_quality(self.image_quality),
+                "output_format": validate_image_format(self.image_format),
+            }
+            tools.append(image_tool)
         if self._vector_store_id:
             tools.append(
                 {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
@@ -167,6 +199,25 @@ class GptCore:
             pprint(response.to_dict(), stream=sys.stderr)
 
         content = (response.output_text or "").strip()
+
+        if self.image_generation:
+            for item in response.output:
+                if getattr(item, "type", None) != "image_generation_call":
+                    continue
+                b64 = getattr(item, "result", None)
+                if not b64:
+                    continue
+                path = (
+                    self.file.parent
+                    / f"{self.file.stem}-{self.output_image_index:02d}.{self.image_format}"
+                )
+                self.output_image_index += 1
+                with open(path, "wb") as f:
+                    f.write(base64.b64decode(b64))
+                img_md = f"```\n{path}\n```\n![]({path})"
+                content = f"{content}\n\n{img_md}" if content else img_md
+                self._carryover_image_paths.append(path)
+
         self.messages.append({"role": "assistant", "content": content})
 
         if self.web_search:
@@ -189,7 +240,7 @@ class GptCore:
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
     def _init_session(
-        self, image_path, file_paths, vectorize_file_paths, vector_store_id
+        self, image_paths, file_paths, vectorize_file_paths, vector_store_id
     ):
         """Reset per-session state and populate the attachment slots."""
         self._images = []
@@ -197,7 +248,8 @@ class GptCore:
         self._vector_store_id = vector_store_id or None
         self._vector_store_owned = False
         self._vector_files = []
-        self._next_image_path = image_path
+        self._carryover_image_paths = []
+        self._next_image_paths = image_paths
         self._next_file_paths = file_paths
         self._next_vectorize_paths = vectorize_file_paths
 
@@ -214,14 +266,16 @@ class GptCore:
                     )
                 self.vectors_api.wait_for_vector_store(self._vector_store_id)
             self._next_vectorize_paths = None
-        image_path, file_paths = self._next_image_path, self._next_file_paths
-        self._next_image_path = None
+        image_paths = self._carryover_image_paths + list(self._next_image_paths or [])
+        file_paths = self._next_file_paths
+        self._carryover_image_paths = []
+        self._next_image_paths = None
         self._next_file_paths = None
-        return image_path, file_paths
+        return image_paths or None, file_paths
 
     def main(
         self,
-        image_path=None,
+        image_paths=None,
         file_paths=None,
         vectorize_file_paths=None,
         vector_store_id=None,
@@ -230,14 +284,14 @@ class GptCore:
         if not self.input or not self.output:
             raise RuntimeError("Calling main without input/output callback set.")
         self._init_session(
-            image_path, file_paths, vectorize_file_paths, vector_store_id
+            image_paths, file_paths, vectorize_file_paths, vector_store_id
         )
         price = 0.0
         total_web_search_calls = 0
         try:
             while prompt := self.input():
-                img, fps = self._consume_attachments()
-                content, info = self.send(prompt, image_path=img, file_paths=fps)
+                imgs, fps = self._consume_attachments()
+                content, info = self.send(prompt, image_paths=imgs, file_paths=fps)
                 if price is not None and info.price is not None:
                     price += info.price
                 else:

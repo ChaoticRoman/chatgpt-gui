@@ -212,8 +212,9 @@ def main():
     parser.add_argument(
         "-i",
         "--image",
+        nargs="+",
         metavar="FILE",
-        help="Image file to include.",
+        help="Image file(s) to include.",
     )
     parser.add_argument(
         "-f",
@@ -420,7 +421,7 @@ def main():
             image_generation=args.image_generation,
             debug=args.debug,
         ).main(
-            image_path=args.image,
+            image_paths=args.image,
             file_paths=args.file,
             vectorize_file_paths=args.vectorize_file,
             vector_store_id=args.vector_store,
@@ -468,7 +469,7 @@ def main():
         image_generation=args.image_generation,
         debug=args.debug,
     ).main(
-        image_path=args.image,
+        image_paths=args.image,
         file_paths=args.file,
         vectorize_file_paths=args.vectorize_file,
         vector_store_id=args.vector_store,

@@ -52,7 +52,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-ig`, `--image-generation` | Enable image generation; images saved to the data directory |
 | `-p`, `--prepend` | Prepend a string (followed by two newlines) to the first message |
 | `-pf`, `--prepend-file` | Prepend a file's contents to the first message |
-| `-i`, `--image` | Image file to include |
+| `-i`, `--image` | Image file(s) to include |
 | `-f`, `--file` | Document(s) to include |
 | `-vf`, `--vectorize-file` | Document(s) to upload to a vector store for semantic file search |
 | `-vs`, `--vector-store` | Use a pre-existing vector store by ID for semantic file search; can be combined with `-vf` to upload additional files into it (files are kept after the session) |

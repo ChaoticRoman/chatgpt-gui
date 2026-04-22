@@ -132,12 +132,12 @@ class GptCore:
         if self.save_callback:
             self.save_callback()
 
-    def send(self, prompt, image_path=None, file_paths=None):
+    def send(self, prompt, image_paths=None, file_paths=None):
         """Send a message and get response. Returns (content, Info)."""
         content = []
-        if image_path:
-            name = Path(image_path).name
-            file_id = self.files_api.upload_file(image_path, "vision")
+        for path in image_paths or []:
+            name = Path(path).name
+            file_id = self.files_api.upload_file(path, "vision")
             self._images.append((name, file_id))
             content.append({"type": "input_image", "file_id": file_id})
         for path in file_paths or []:
@@ -155,7 +155,7 @@ class GptCore:
             tools.append({"type": "web_search"})
             includes.append("web_search_call.action.sources")
         if self.image_generation:
-            tools.append({"type": "image_generation"})
+            tools.append({"type": "image_generation", "model": "gpt-image-2"})
         if self._vector_store_id:
             tools.append(
                 {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
@@ -213,7 +213,7 @@ class GptCore:
         return content, Info(input_tokens, output_tokens, web_search_calls, step_price)
 
     def _init_session(
-        self, image_path, file_paths, vectorize_file_paths, vector_store_id
+        self, image_paths, file_paths, vectorize_file_paths, vector_store_id
     ):
         """Reset per-session state and populate the attachment slots."""
         self._images = []
@@ -221,7 +221,7 @@ class GptCore:
         self._vector_store_id = vector_store_id or None
         self._vector_store_owned = False
         self._vector_files = []
-        self._next_image_path = image_path
+        self._next_image_paths = image_paths
         self._next_file_paths = file_paths
         self._next_vectorize_paths = vectorize_file_paths
 
@@ -238,14 +238,14 @@ class GptCore:
                     )
                 self.vectors_api.wait_for_vector_store(self._vector_store_id)
             self._next_vectorize_paths = None
-        image_path, file_paths = self._next_image_path, self._next_file_paths
-        self._next_image_path = None
+        image_paths, file_paths = self._next_image_paths, self._next_file_paths
+        self._next_image_paths = None
         self._next_file_paths = None
-        return image_path, file_paths
+        return image_paths, file_paths
 
     def main(
         self,
-        image_path=None,
+        image_paths=None,
         file_paths=None,
         vectorize_file_paths=None,
         vector_store_id=None,
@@ -254,14 +254,14 @@ class GptCore:
         if not self.input or not self.output:
             raise RuntimeError("Calling main without input/output callback set.")
         self._init_session(
-            image_path, file_paths, vectorize_file_paths, vector_store_id
+            image_paths, file_paths, vectorize_file_paths, vector_store_id
         )
         price = 0.0
         total_web_search_calls = 0
         try:
             while prompt := self.input():
-                img, fps = self._consume_attachments()
-                content, info = self.send(prompt, image_path=img, file_paths=fps)
+                imgs, fps = self._consume_attachments()
+                content, info = self.send(prompt, image_paths=imgs, file_paths=fps)
                 if price is not None and info.price is not None:
                     price += info.price
                 else:

@@ -536,17 +536,17 @@ class JsonViewerApp(tk.Tk):
 
         # Populate the core's attachment slots before unblocking input().
         # The background thread is blocked on queue.get() so writes are safe.
-        image_path, file_paths, vectorize_paths = None, [], []
+        image_paths, file_paths, vectorize_paths = [], [], []
         for iid in self.att_tree.get_children():
             path, purpose = self._attachment_data[iid]
             if purpose == "vision":
-                image_path = path
+                image_paths.append(path)
             elif purpose == "user_data":
                 file_paths.append(path)
             elif purpose == "assistants":
                 vectorize_paths.append(path)
         self._clear_attachment_list()
-        self.gpt_core._next_image_path = image_path
+        self.gpt_core._next_image_paths = image_paths or None
         self.gpt_core._next_file_paths = file_paths or None
         self.gpt_core._next_vectorize_paths = vectorize_paths or None
 
@@ -589,11 +589,6 @@ class JsonViewerApp(tk.Tk):
         for path in paths:
             ext = Path(path).suffix.lower()
             if ext in IMAGE_EXTENSIONS:
-                # Only one vision file allowed — replace any existing one
-                for iid in list(self.att_tree.get_children()):
-                    if self._attachment_data[iid][1] == "vision":
-                        del self._attachment_data[iid]
-                        self.att_tree.delete(iid)
                 self._insert_attachment(path, "vision")
             else:
                 self._insert_attachment(path, "user_data")

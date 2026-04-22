@@ -50,7 +50,7 @@ Quit with `q`, `x`, `exit`, `quit`, `Ctrl+C`, or `Ctrl+D`.
 | `-M`, `--model` | Select a specific model |
 | `-w`, `--web-search` | Enable web search with source extraction |
 | `-ig`, `--image-generation` | Enable image generation; images saved to the data directory |
-| `--image-size` | Generated image size (`auto` or `WIDTHxHEIGHT`, e.g. `1024x1024`); default `1024x640` |
+| `--image-size` | Generated image size (`auto` or `WIDTHxHEIGHT`, e.g. `1024x1024`); default `1024x1024` |
 | `--image-quality` | Generated image quality: `auto`, `low`, `medium`, `high`; default `low` |
 | `--image-format` | Generated image format: `png`, `jpeg`, `webp`; default `jpeg` |
 | `--image-model` | Image generation model: `gpt-image-2`, `gpt-image-1.5`, `gpt-image-1`, `gpt-image-1-mini`; default `gpt-image-1-mini` |

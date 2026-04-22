@@ -77,6 +77,7 @@ class GptCore:
         self._vector_store_id = None
         self._vector_store_owned = False
         self._vector_files = []
+        self._carryover_image_paths = []
         self.output_image_index = 0
 
         timestamp = dt.now().replace(microsecond=0).isoformat()
@@ -190,6 +191,7 @@ class GptCore:
                     f.write(base64.b64decode(b64))
                 img_md = f"```\n{path}\n```\n![]({path})"
                 content = f"{content}\n\n{img_md}" if content else img_md
+                self._carryover_image_paths.append(path)
 
         self.messages.append({"role": "assistant", "content": content})
 
@@ -221,6 +223,7 @@ class GptCore:
         self._vector_store_id = vector_store_id or None
         self._vector_store_owned = False
         self._vector_files = []
+        self._carryover_image_paths = []
         self._next_image_paths = image_paths
         self._next_file_paths = file_paths
         self._next_vectorize_paths = vectorize_file_paths
@@ -238,10 +241,12 @@ class GptCore:
                     )
                 self.vectors_api.wait_for_vector_store(self._vector_store_id)
             self._next_vectorize_paths = None
-        image_paths, file_paths = self._next_image_paths, self._next_file_paths
+        image_paths = self._carryover_image_paths + list(self._next_image_paths or [])
+        file_paths = self._next_file_paths
+        self._carryover_image_paths = []
         self._next_image_paths = None
         self._next_file_paths = None
-        return image_paths, file_paths
+        return image_paths or None, file_paths
 
     def main(
         self,

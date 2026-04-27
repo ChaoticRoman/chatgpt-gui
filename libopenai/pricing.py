@@ -22,6 +22,7 @@ USD_PER_TOKEN = {
     "gpt-5.4-mini": Pricing(0.75e-6, 4.5e-6),
     "gpt-5.4": Pricing(2.5e-6, 15e-6),
     "gpt-5.4-pro": Pricing(30e-6, 180e-6),
+    "gpt-5.5": Pricing(5e-6, 30e-6),
 }
 
 KNOWN_MODELS = sorted(USD_PER_TOKEN.keys())

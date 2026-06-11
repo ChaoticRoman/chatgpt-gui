@@ -134,8 +134,9 @@ highlighting.
 
 - **Resizable panes** — drag the separators between panels to adjust layout
 - **Sortable conversation list** — click the column header to toggle sort order
-- **Auto-refreshing list** — the conversation list reloads automatically when the data
-  directory changes (e.g. a new conversation is added by the CLI or another instance)
+- **Auto-refreshing** — the conversation list reloads when the data directory changes,
+  and the open conversation reloads when its file is edited (e.g. by the CLI or another
+  instance) — so external updates appear without reselecting or restarting
 - **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for a new line
 
 ### Other Tools

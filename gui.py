@@ -308,6 +308,7 @@ class JsonViewerApp(tk.Tk):
         self._drafts = {}  # file_path -> {text, attachments, model, vs, web_search}
         self._settings_clipboard = None  # {attachments, vs, web_search}
         self._sash_pos = None
+        self._known_files = set()  # on-disk .json set; refreshed by load_conversations
 
         # Load the list of JSON files
         self.load_conversations()
@@ -327,6 +328,9 @@ class JsonViewerApp(tk.Tk):
 
         # Killing with CTRL+C in the console
         self.check()
+
+        # Auto-reload the conversation list when the data directory changes on disk
+        self.after(1000, self._poll_conversations)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -348,16 +352,19 @@ class JsonViewerApp(tk.Tk):
             core._input_queue.put(None)
         self.destroy()
 
+    def _list_disk_conversations(self):
+        """Return the set of conversation .json filenames currently on disk."""
+        if os.path.exists(DATA_DIRECTORY):
+            return {f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")}
+        return set()
+
     def load_conversations(self):
         """Load the list of conversations in file_table."""
         for item in self.file_table.get_children():
             self.file_table.delete(item)
-        if os.path.exists(DATA_DIRECTORY):
-            for file in sorted(
-                [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")],
-                reverse=self.sort_descending,
-            ):
-                self.file_table.insert("", END, values=(file.removesuffix(".json"),))
+        disk_files = self._list_disk_conversations()
+        for file in sorted(disk_files, reverse=self.sort_descending):
+            self.file_table.insert("", END, values=(file.removesuffix(".json"),))
         # Re-add unsaved conversations that exist in memory but not yet on disk
         for core in getattr(self, "_cores", {}).values():
             if not Path(core.file).exists():
@@ -365,17 +372,32 @@ class JsonViewerApp(tk.Tk):
                 self.file_table.insert(
                     "", pos, values=(Path(core.file).stem,), tags=("unsaved",)
                 )
+        self._known_files = disk_files
 
-    def toggle_sort(self):
-        """Toggle sort order and reload file list."""
+    def _reload_preserving_selection(self):
+        """Reload the conversation list, keeping the current selection if it remains."""
         selection = self.file_table.selection()
         selected_name = (
             self.file_table.item(selection[0])["values"][0] if selection else None
         )
-        self.sort_descending = not self.sort_descending
         self.load_conversations()
         if selected_name:
             self._select_file_in_list(selected_name)
+
+    def _poll_conversations(self):
+        """Auto-reload the list when the conversation directory changes on disk
+        (e.g. a new conversation is created by the CLI or another instance)."""
+        try:
+            if self._list_disk_conversations() != self._known_files:
+                self._reload_preserving_selection()
+        except OSError:
+            pass
+        self.after(1000, self._poll_conversations)
+
+    def toggle_sort(self):
+        """Toggle sort order and reload file list."""
+        self.sort_descending = not self.sort_descending
+        self._reload_preserving_selection()
 
     def _save_draft(self):
         """Persist all per-conversation draft state for the active conversation."""
@@ -513,6 +535,7 @@ class JsonViewerApp(tk.Tk):
 
         # Remove physical file and list row
         Path(file_path).unlink(missing_ok=True)
+        self._known_files.discard(file_name)
         self.file_table.delete(item)
 
         if next_item:
@@ -759,6 +782,9 @@ class JsonViewerApp(tk.Tk):
 
     def _refresh_list_if_new(self, core):
         """On first save of a new conversation, clear the gray 'unsaved' tag."""
+        # Track the file the GUI just wrote so the directory poll doesn't see it
+        # as an external change and trigger a redundant reload.
+        self._known_files.add(Path(core.file).name)
         display_name = Path(core.file).stem
         for item in self.file_table.get_children():
             row = self.file_table.item(item)

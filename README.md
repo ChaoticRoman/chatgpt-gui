@@ -134,6 +134,9 @@ highlighting.
 
 - **Resizable panes** — drag the separators between panels to adjust layout
 - **Sortable conversation list** — click the column header to toggle sort order
+- **Auto-refreshing** — the conversation list reloads when the data directory changes,
+  and the open conversation reloads when its file is edited (e.g. by the CLI or another
+  instance) — so external updates appear without reselecting or restarting
 - **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for a new line
 
 ### Other Tools
@@ -143,20 +146,27 @@ highlighting.
 
 ## Development
 
-Install test dependencies:
+Install dev dependencies (test runner and type checker):
 
 ```bash
-pip install pytest pytest-xdist
+pip install pytest pytest-xdist pyright
 ```
 
 Format, lint, and test with:
 
 ```bash
 make format
-make lint
-make test   # sequential
-make xtest  # parallel (16 workers)
+make lint         # ruff check + format diff, import check, type check
+make importcheck  # import every shippable module to catch import-time errors
+make typecheck    # pyright (see pyrightconfig.json)
+make test         # sequential
+make xtest        # parallel (16 workers)
 ```
+
+`make lint` runs ruff plus two static checks: `importcheck` imports the library and
+the entry-point clients (`cli.py`, `dale.py`, `gui.py`) so a broken import fails fast,
+and `typecheck` runs pyright over the library and clients (`libopenai/`, `cli.py`,
+`dale.py`, `gui.py`). All of these run on every PR via GitHub Actions.
 
 Run a single test suite:
 

@@ -1,0 +1,9 @@
+{
+    "include": [
+        "libopenai",
+        "cli.py",
+        "dale.py",
+        "gui.py"
+    ],
+    "typeCheckingMode": "basic"
+}

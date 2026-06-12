@@ -19,7 +19,7 @@ from tkinter import (
 from tkinter import font as tkfont
 from tkinter import ttk
 
-from tkinterweb import HtmlFrame
+from tkinterweb import HtmlFrame  # pyright: ignore[reportAttributeAccessIssue]
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
@@ -117,7 +117,7 @@ class JsonViewerApp(tk.Tk):
         self.vpaned = tk.PanedWindow(self.hpaned, orient=tk.VERTICAL, sashwidth=5)
         self.hpaned.add(self.vpaned, minsize=300)
 
-        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)
+        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)  # pyright: ignore[reportArgumentType]
         self.vpaned.add(self.file_content_text, minsize=100)
 
         # Input frame at the bottom (inside vertical paned window)
@@ -308,6 +308,8 @@ class JsonViewerApp(tk.Tk):
         self._drafts = {}  # file_path -> {text, attachments, model, vs, web_search}
         self._settings_clipboard = None  # {attachments, vs, web_search}
         self._sash_pos = None
+        self._known_files = set()  # on-disk .json set; refreshed by load_conversations
+        self._selected_mtime = None  # mtime of the open conversation as last rendered
 
         # Load the list of JSON files
         self.load_conversations()
@@ -327,6 +329,9 @@ class JsonViewerApp(tk.Tk):
 
         # Killing with CTRL+C in the console
         self.check()
+
+        # Auto-reload the conversation list when the data directory changes on disk
+        self.after(1000, self._poll_conversations)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -348,16 +353,19 @@ class JsonViewerApp(tk.Tk):
             core._input_queue.put(None)
         self.destroy()
 
+    def _list_disk_conversations(self):
+        """Return the set of conversation .json filenames currently on disk."""
+        if os.path.exists(DATA_DIRECTORY):
+            return {f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")}
+        return set()
+
     def load_conversations(self):
         """Load the list of conversations in file_table."""
         for item in self.file_table.get_children():
             self.file_table.delete(item)
-        if os.path.exists(DATA_DIRECTORY):
-            for file in sorted(
-                [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")],
-                reverse=self.sort_descending,
-            ):
-                self.file_table.insert("", END, values=(file.removesuffix(".json"),))
+        disk_files = self._list_disk_conversations()
+        for file in sorted(disk_files, reverse=self.sort_descending):
+            self.file_table.insert("", END, values=(file.removesuffix(".json"),))
         # Re-add unsaved conversations that exist in memory but not yet on disk
         for core in getattr(self, "_cores", {}).values():
             if not Path(core.file).exists():
@@ -365,17 +373,69 @@ class JsonViewerApp(tk.Tk):
                 self.file_table.insert(
                     "", pos, values=(Path(core.file).stem,), tags=("unsaved",)
                 )
+        self._known_files = disk_files
 
-    def toggle_sort(self):
-        """Toggle sort order and reload file list."""
+    def _reload_preserving_selection(self):
+        """Reload the conversation list, keeping the current selection if it remains."""
         selection = self.file_table.selection()
         selected_name = (
             self.file_table.item(selection[0])["values"][0] if selection else None
         )
-        self.sort_descending = not self.sort_descending
         self.load_conversations()
         if selected_name:
             self._select_file_in_list(selected_name)
+
+    def _poll_conversations(self):
+        """Auto-reload on disk changes (e.g. edits made by the CLI or another
+        instance): the list when the directory's file set changes, and the open
+        conversation when its own file content changes."""
+        try:
+            if self._list_disk_conversations() != self._known_files:
+                self._reload_preserving_selection()
+            self._reload_selected_if_changed()
+        except (OSError, json.JSONDecodeError):
+            pass
+        finally:
+            self.after(1000, self._poll_conversations)
+
+    def _mark_selected_synced(self):
+        """Record the open conversation file's mtime so the content poll only
+        reacts to changes made outside this GUI."""
+        core = self.gpt_core
+        if core and os.path.exists(core.file):
+            self._selected_mtime = os.path.getmtime(core.file)
+        else:
+            self._selected_mtime = None
+
+    def _reload_selected_if_changed(self):
+        """Re-read the open conversation when its file changed underneath us.
+
+        Skipped while the conversation is busy — its own request owns the file
+        and will refresh the view on completion. Both the in-memory core and the
+        rendered view are updated so a later send builds on the latest on-disk
+        content instead of overwriting it. Safe to mutate core.messages here: an
+        idle core's thread is blocked on input()."""
+        core = self.gpt_core
+        if not core:
+            return
+        path = str(core.file)
+        if path in self._busy_paths or not os.path.exists(path):
+            return
+        mtime = os.path.getmtime(path)
+        if mtime == self._selected_mtime:
+            return
+        self._selected_mtime = mtime
+        with open(path, "r") as f:
+            file_content = json.load(f)
+        core.messages = [
+            {"role": m["role"], "content": m["content"]} for m in file_content
+        ]
+        self.display_conversation(file_content)
+
+    def toggle_sort(self):
+        """Toggle sort order and reload file list."""
+        self.sort_descending = not self.sort_descending
+        self._reload_preserving_selection()
 
     def _save_draft(self):
         """Persist all per-conversation draft state for the active conversation."""
@@ -437,8 +497,10 @@ class JsonViewerApp(tk.Tk):
             self.display_conversation(file_content)
         else:
             # Unsaved new conversation: restore state from the in-memory core
-            self.initialize_gpt_core([], file_path)
-            self.display_conversation(self.gpt_core.messages)
+            core = self.initialize_gpt_core([], file_path)
+            self.display_conversation(core.messages)
+
+        self._mark_selected_synced()
 
         # Restore draft unconditionally so the input is correct when busy state ends
         self._restore_draft(file_path)
@@ -456,14 +518,16 @@ class JsonViewerApp(tk.Tk):
         """Attach to an existing GptCore for this conversation, or start a new one."""
         key = str(file_path)
         if key in self._cores:
-            self.gpt_core = self._cores[key]
-            return
+            core = self._cores[key]
+            self.gpt_core = core
+            return core
         core = GptCore(client=self.client)
         core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
         core.file = file_path
         self._launch_core(core)
+        return core
 
     def new_conversation(self):
         """Start a blank conversation — GptCore.__init__ sets messages=[] and a fresh file path."""
@@ -480,6 +544,7 @@ class JsonViewerApp(tk.Tk):
         self.file_table.insert("", pos, values=(display_name,), tags=("unsaved",))
         self._select_file_in_list(display_name)
         self.display_conversation([])
+        self._mark_selected_synced()
 
     def delete_conversation(self):
         """Delete the selected conversation: remove from disk, list, and internal state."""
@@ -513,6 +578,7 @@ class JsonViewerApp(tk.Tk):
 
         # Remove physical file and list row
         Path(file_path).unlink(missing_ok=True)
+        self._known_files.discard(file_name)
         self.file_table.delete(item)
 
         if next_item:
@@ -544,6 +610,7 @@ class JsonViewerApp(tk.Tk):
                 # Guard: skip display/UI updates if the user switched away.
                 if self.gpt_core is core:
                     self.display_conversation(core.messages)
+                    self._mark_selected_synced()
                     self._set_ui_idle()
                     self.input_text.focus()
                     # Scroll after a short delay to let tkinterweb finish layout
@@ -759,6 +826,9 @@ class JsonViewerApp(tk.Tk):
 
     def _refresh_list_if_new(self, core):
         """On first save of a new conversation, clear the gray 'unsaved' tag."""
+        # Track the file the GUI just wrote so the directory poll doesn't see it
+        # as an external change and trigger a redundant reload.
+        self._known_files.add(Path(core.file).name)
         display_name = Path(core.file).stem
         for item in self.file_table.get_children():
             row = self.file_table.item(item)
@@ -868,7 +938,7 @@ def extract_content(content):
                 return item["text"]
 
     # Old format is simply <CONTENT>
-    return content
+    return content if isinstance(content, str) else str(content)
 
 
 def format_json(conversation_json):

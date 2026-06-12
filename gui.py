@@ -19,7 +19,7 @@ from tkinter import (
 from tkinter import font as tkfont
 from tkinter import ttk
 
-from tkinterweb import HtmlFrame
+from tkinterweb import HtmlFrame  # pyright: ignore[reportAttributeAccessIssue]
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
 
@@ -117,7 +117,7 @@ class JsonViewerApp(tk.Tk):
         self.vpaned = tk.PanedWindow(self.hpaned, orient=tk.VERTICAL, sashwidth=5)
         self.hpaned.add(self.vpaned, minsize=300)
 
-        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)
+        self.file_content_text = HtmlFrame(self.vpaned, messages_enabled=False)  # pyright: ignore[reportArgumentType]
         self.vpaned.add(self.file_content_text, minsize=100)
 
         # Input frame at the bottom (inside vertical paned window)
@@ -496,8 +496,8 @@ class JsonViewerApp(tk.Tk):
             self.display_conversation(file_content)
         else:
             # Unsaved new conversation: restore state from the in-memory core
-            self.initialize_gpt_core([], file_path)
-            self.display_conversation(self.gpt_core.messages)
+            core = self.initialize_gpt_core([], file_path)
+            self.display_conversation(core.messages)
 
         self._mark_selected_synced()
 
@@ -517,14 +517,16 @@ class JsonViewerApp(tk.Tk):
         """Attach to an existing GptCore for this conversation, or start a new one."""
         key = str(file_path)
         if key in self._cores:
-            self.gpt_core = self._cores[key]
-            return
+            core = self._cores[key]
+            self.gpt_core = core
+            return core
         core = GptCore(client=self.client)
         core.messages = [
             {"role": m["role"], "content": m["content"]} for m in existing_messages
         ]
         core.file = file_path
         self._launch_core(core)
+        return core
 
     def new_conversation(self):
         """Start a blank conversation — GptCore.__init__ sets messages=[] and a fresh file path."""
@@ -935,7 +937,7 @@ def extract_content(content):
                 return item["text"]
 
     # Old format is simply <CONTENT>
-    return content
+    return content if isinstance(content, str) else str(content)
 
 
 def format_json(conversation_json):

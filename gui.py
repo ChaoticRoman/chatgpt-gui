@@ -393,9 +393,10 @@ class JsonViewerApp(tk.Tk):
             if self._list_disk_conversations() != self._known_files:
                 self._reload_preserving_selection()
             self._reload_selected_if_changed()
-        except OSError:
+        except (OSError, json.JSONDecodeError):
             pass
-        self.after(1000, self._poll_conversations)
+        finally:
+            self.after(1000, self._poll_conversations)
 
     def _mark_selected_synced(self):
         """Record the open conversation file's mtime so the content poll only

@@ -12,7 +12,7 @@ format:
 	ruff format .
 
 importcheck:
-	python -c "import libopenai.auth, libopenai.constants, libopenai.core, libopenai.files, libopenai.pricing, libopenai.validation, libopenai.vectors, cli, dale, gui"
+	python -c "import libopenai.auth, libopenai.constants, libopenai.core, libopenai.files, libopenai.pricing, libopenai.validation, libopenai.vectors, cli, dale, gui, pricing"
 
 typecheck:
 	pyright

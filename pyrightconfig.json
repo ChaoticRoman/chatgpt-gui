@@ -3,7 +3,8 @@
         "libopenai",
         "cli.py",
         "dale.py",
-        "gui.py"
+        "gui.py",
+        "pricing.py"
     ],
     "typeCheckingMode": "basic"
 }

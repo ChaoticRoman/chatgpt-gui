@@ -143,6 +143,7 @@ highlighting.
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API
 - **`dale.py`** — generate images using DALL-E 3 (`./dale.py "prompt" [-n N] [-j N]`)
+- **`pricing.py`** — compute the price for token counts (`./pricing.py [-m MODEL] INPUT_TOKENS OUTPUT_TOKENS`); token counts accept a `k` or `M` suffix, e.g. `./pricing.py -m gpt-5 1.5k 500`
 
 ## Development
 
@@ -164,9 +165,10 @@ make xtest        # parallel (16 workers)
 ```
 
 `make lint` runs ruff plus two static checks: `importcheck` imports the library and
-the entry-point clients (`cli.py`, `dale.py`, `gui.py`) so a broken import fails fast,
-and `typecheck` runs pyright over the library and clients (`libopenai/`, `cli.py`,
-`dale.py`, `gui.py`). All of these run on every PR via GitHub Actions.
+the entry-point clients (`cli.py`, `dale.py`, `gui.py`, `pricing.py`) so a broken
+import fails fast, and `typecheck` runs pyright over the library and clients
+(`libopenai/`, `cli.py`, `dale.py`, `gui.py`). All of these run on every PR via
+GitHub Actions.
 
 Run a single test suite:
 

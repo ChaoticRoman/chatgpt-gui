@@ -17,6 +17,7 @@ from tkinter import (
     filedialog,
 )
 from tkinter import font as tkfont
+from tkinter import simpledialog
 from tkinter import ttk
 
 from tkinterweb import HtmlFrame  # pyright: ignore[reportAttributeAccessIssue]
@@ -27,6 +28,7 @@ from libopenai.auth import initialize_client
 from libopenai.core import GptCore
 from libopenai.vectors import Vectors
 from libopenai.constants import (
+    CONVERSATION_NAMES_FILE,
     DATA_DIRECTORY,
     DEFAULT_MODEL,
     IMAGE_EXTENSIONS,
@@ -89,6 +91,13 @@ class JsonViewerApp(tk.Tk):
             command=self.delete_conversation,
         )
         self.del_conv_button.pack(side=tk.BOTTOM, fill=tk.X)
+        # Packed after Delete but before New so the buttons stack New / Name / Delete
+        self.name_conv_button = Button(
+            self.left_frame,
+            text="Name Conversation",
+            command=self.name_conversation,
+        )
+        self.name_conv_button.pack(side=tk.BOTTOM, fill=tk.X)
         self.new_conv_button = Button(
             self.left_frame,
             text="New Conversation",
@@ -98,13 +107,15 @@ class JsonViewerApp(tk.Tk):
         self.new_conv_button.pack(side=tk.BOTTOM, fill=tk.X)
         self.file_table = ttk.Treeview(
             self.table_frame,
-            columns=("file",),
+            columns=("file", "name"),
             show="headings",
             selectmode="browse",
             style="File.Treeview",
         )
         self.file_table.heading("file", text="Conversation", command=self.toggle_sort)
+        self.file_table.heading("name", text="Name")
         self.file_table.column("file", anchor="w")
+        self.file_table.column("name", anchor="w")
         self.file_table.pack(side=LEFT, fill=BOTH, expand=True)
         self.scrollbar = Scrollbar(self.table_frame, command=self.file_table.yview)
         self.scrollbar.pack(side=RIGHT, fill=Y)
@@ -310,6 +321,7 @@ class JsonViewerApp(tk.Tk):
         self._sash_pos = None
         self._known_files = set()  # on-disk .json set; refreshed by load_conversations
         self._selected_mtime = None  # mtime of the open conversation as last rendered
+        self._conversation_names = {}  # stem -> display name; refreshed in load_conversations
 
         # Load the list of JSON files
         self.load_conversations()
@@ -338,15 +350,18 @@ class JsonViewerApp(tk.Tk):
     def _fit_left_pane(self):
         self.update_idletasks()
         fixed = tkfont.nametofont("TkFixedFont")
-        widths = [
-            fixed.measure(self.file_table.item(i)["values"][0])
-            for i in self.file_table.get_children()
+        rows = [
+            self.file_table.item(i)["values"] for i in self.file_table.get_children()
         ]
         fallback = fixed.measure("2026-04-13T10:30:00-abc123")
-        col_w = (max(widths) if widths else fallback) + 16
+        file_widths = [fixed.measure(str(r[0])) for r in rows]
+        file_w = (max(file_widths) if file_widths else fallback) + 16
+        name_widths = [fixed.measure(str(r[1])) for r in rows if len(r) > 1 and r[1]]
+        name_w = (max(name_widths) if name_widths else fixed.measure("Name")) + 16
         sb_w = self.scrollbar.winfo_width() or 17
-        self.file_table.column("file", width=col_w)
-        self.hpaned.sash_place(0, col_w + sb_w, 0)
+        self.file_table.column("file", width=file_w)
+        self.file_table.column("name", width=name_w)
+        self.hpaned.sash_place(0, file_w + name_w + sb_w, 0)
 
     def _on_close(self):
         for core in self._cores.values():
@@ -354,24 +369,56 @@ class JsonViewerApp(tk.Tk):
         self.destroy()
 
     def _list_disk_conversations(self):
-        """Return the set of conversation .json filenames currently on disk."""
+        """Return the set of conversation .json filenames currently on disk.
+
+        The conversation-names file lives in the same directory but is metadata,
+        not a conversation, so it is excluded."""
         if os.path.exists(DATA_DIRECTORY):
-            return {f for f in os.listdir(DATA_DIRECTORY) if f.endswith(".json")}
+            return {
+                f
+                for f in os.listdir(DATA_DIRECTORY)
+                if f.endswith(".json") and f != CONVERSATION_NAMES_FILE
+            }
         return set()
+
+    def _load_conversation_names(self):
+        """Read the stem -> display name map from disk; empty on any problem."""
+        try:
+            with open(DATA_DIRECTORY / CONVERSATION_NAMES_FILE, "r") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {str(k): str(v) for k, v in data.items()}
+        except (OSError, json.JSONDecodeError):
+            pass
+        return {}
+
+    def _save_conversation_names(self):
+        """Persist the stem -> display name map to the user data directory."""
+        os.makedirs(DATA_DIRECTORY, exist_ok=True)
+        with open(DATA_DIRECTORY / CONVERSATION_NAMES_FILE, "w") as f:
+            json.dump(self._conversation_names, f, sort_keys=True, indent=4)
 
     def load_conversations(self):
         """Load the list of conversations in file_table."""
+        self._conversation_names = self._load_conversation_names()
         for item in self.file_table.get_children():
             self.file_table.delete(item)
         disk_files = self._list_disk_conversations()
         for file in sorted(disk_files, reverse=self.sort_descending):
-            self.file_table.insert("", END, values=(file.removesuffix(".json"),))
+            stem = file.removesuffix(".json")
+            self.file_table.insert(
+                "", END, values=(stem, self._conversation_names.get(stem, ""))
+            )
         # Re-add unsaved conversations that exist in memory but not yet on disk
         for core in getattr(self, "_cores", {}).values():
             if not Path(core.file).exists():
                 pos = 0 if self.sort_descending else END
+                stem = Path(core.file).stem
                 self.file_table.insert(
-                    "", pos, values=(Path(core.file).stem,), tags=("unsaved",)
+                    "",
+                    pos,
+                    values=(stem, self._conversation_names.get(stem, "")),
+                    tags=("unsaved",),
                 )
         self._known_files = disk_files
 
@@ -541,7 +588,12 @@ class JsonViewerApp(tk.Tk):
         # Add a gray placeholder entry so the user can navigate back before the first save
         display_name = Path(core.file).stem
         pos = 0 if self.sort_descending else END
-        self.file_table.insert("", pos, values=(display_name,), tags=("unsaved",))
+        self.file_table.insert(
+            "",
+            pos,
+            values=(display_name, self._conversation_names.get(display_name, "")),
+            tags=("unsaved",),
+        )
         self._select_file_in_list(display_name)
         self.display_conversation([])
         self._mark_selected_synced()
@@ -561,7 +613,8 @@ class JsonViewerApp(tk.Tk):
             else (children[idx - 1] if idx > 0 else None)
         )
 
-        file_name = self.file_table.item(item)["values"][0] + ".json"
+        stem = str(self.file_table.item(item)["values"][0])
+        file_name = stem + ".json"
         file_path = os.path.join(DATA_DIRECTORY, file_name)
         key = str(file_path)
 
@@ -570,6 +623,10 @@ class JsonViewerApp(tk.Tk):
             self._cores.pop(key)._input_queue.put(None)
         self._busy_paths.discard(key)
         self._drafts.pop(key, None)
+
+        # Drop the stored display name so the names file doesn't accumulate stale entries
+        if self._conversation_names.pop(stem, None) is not None:
+            self._save_conversation_names()
 
         # Clear active conversation reference so _save_draft is a no-op
         if self.gpt_core and str(self.gpt_core.file) == key:
@@ -586,6 +643,33 @@ class JsonViewerApp(tk.Tk):
         else:
             self.display_conversation([])
             self.new_conversation()
+
+    def name_conversation(self):
+        """Set or change the display name of the selected conversation.
+
+        The name is stored in the conversation-names file (keyed by the
+        conversation's stem) and shown immediately in the Name column. An empty
+        name clears it."""
+        selection = self.file_table.selection()
+        if not selection:
+            return
+        item = selection[0]
+        stem = str(self.file_table.item(item)["values"][0])
+        new_name = simpledialog.askstring(
+            "Name Conversation",
+            "Conversation name:",
+            initialvalue=self._conversation_names.get(stem, ""),
+            parent=self,
+        )
+        if new_name is None:
+            return  # dialog cancelled
+        new_name = new_name.strip()
+        if new_name:
+            self._conversation_names[stem] = new_name
+        else:
+            self._conversation_names.pop(stem, None)
+        self._save_conversation_names()
+        self.file_table.item(item, values=(stem, new_name))
 
     def _launch_core(self, core):
         """Wire up GUI callbacks to a GptCore instance and start its main loop thread.

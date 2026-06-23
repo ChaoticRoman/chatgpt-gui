@@ -134,6 +134,9 @@ highlighting.
 
 - **Resizable panes** — drag the separators between panels to adjust layout
 - **Sortable conversation list** — click the column header to toggle sort order
+- **Named conversations** — the **Name Conversation** button (between **New** and
+  **Delete**) sets a friendly name shown in the **Name** column; names are stored in
+  `conversation-names.json` in the data directory, separate from the conversations
 - **Auto-refreshing** — the conversation list reloads when the data directory changes,
   and the open conversation reloads when its file is edited (e.g. by the CLI or another
   instance) — so external updates appear without reselecting or restarting

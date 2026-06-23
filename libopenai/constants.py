@@ -25,3 +25,7 @@ USER_DATA_EXTENSIONS = (
 DATA_DIRECTORY = Path(
     os.environ.get("CHATGPT_GUI_DATA_DIR", Path.home() / ".chatgpt-gui")
 ).expanduser()
+
+# Conversation display names, kept alongside the conversations but not itself a
+# conversation — callers listing conversations must exclude this file.
+CONVERSATION_NAMES_FILE = "conversation-names.json"

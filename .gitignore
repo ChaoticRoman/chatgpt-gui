@@ -1,6 +1,5 @@
 .*api_key*
 __pycache__
 *.pyc
-/*.png
 .claude
 *.debug

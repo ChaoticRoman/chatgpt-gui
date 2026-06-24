@@ -55,7 +55,7 @@ TEMPORARY_VECTOR_STORE = "(temporary)"
 
 class JsonViewerApp(tk.Tk):
     def __init__(self):
-        super().__init__()
+        super().__init__(className="gpt-gui")
 
         self.title("ChatGPT GUI")
         self.geometry("1200x1000")

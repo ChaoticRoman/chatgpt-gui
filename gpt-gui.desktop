@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=gpt-gui
+Exec=/home/roman/projects/chatgpt-gui/gui.py
+Icon=/home/roman/.local/share/icons/hicolor/scalable/apps/gpt-gui-dark.png
+Type=Application
+Terminal=false
+Categories=Utility
+StartupWMClass=gpt-gui

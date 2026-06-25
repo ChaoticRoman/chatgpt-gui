@@ -142,6 +142,19 @@ highlighting.
   instance) — so external updates appear without reselecting or restarting
 - **Keyboard shortcuts** — `Enter` to send, `Shift+Enter` for a new line
 
+#### GUI in Ubuntu desktop
+
+```
+mkdir -p ~/.local/share/icons/hicolor/scalable/apps/
+cp gpt-gui*.png ~/.local/share/icons/hicolor/scalable/apps/
+cp ./gpt-gui.desktop ~/.local/share/applications/
+
+# Update the path to the gui.py and icon (maybe you want to use -dark for dark theme)
+nano ~/.local/share/applications/gpt-gui.desktop
+
+update-desktop-database ~/.local/share/applications/
+```
+
 ### Other Tools
 
 - **`whisper.py`** — transcribe audio using OpenAI's Whisper API

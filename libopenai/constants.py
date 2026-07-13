@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-DEFAULT_MODEL = "gpt-5.5"
+DEFAULT_MODEL = "gpt-5.6-sol"
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 USER_DATA_EXTENSIONS = (

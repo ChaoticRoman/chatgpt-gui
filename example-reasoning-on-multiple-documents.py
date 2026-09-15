@@ -4,14 +4,16 @@ from libopenai.auth import initialize_client
 client = initialize_client()
 
 # Upload
-apple = client.files.create(
-    file=open("./tests/test1.pdf", "rb"),
-    purpose="user_data",
-)
-banana = client.files.create(
-    file=open("./tests/test2.pdf", "rb"),
-    purpose="user_data",
-)
+with open("./tests/test1.pdf", "rb") as f:
+    apple = client.files.create(
+        file=f,
+        purpose="user_data",
+    )
+with open("./tests/test2.pdf", "rb") as f:
+    banana = client.files.create(
+        file=f,
+        purpose="user_data",
+    )
 
 # Propmpt
 response = client.responses.create(

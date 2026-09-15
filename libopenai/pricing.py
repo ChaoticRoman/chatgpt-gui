@@ -23,9 +23,10 @@ USD_PER_TOKEN = {
     "gpt-5.4": Pricing(2.5e-6, 15e-6),
     "gpt-5.4-pro": Pricing(30e-6, 180e-6),
     "gpt-5.5": Pricing(5e-6, 30e-6),
-    "gpt-5.6-luna": Pricing(1e-6, 6e-6),
-    "gpt-5.6-terra": Pricing(2.5e-6, 15e-6),
-    "gpt-5.6-sol": Pricing(5e-6, 30e-6),
+    "gpt-5.6-luna": Pricing(0.2e-6, 1.2e-6),
+    "gpt-5.6-terra": Pricing(2e-6, 12e-6),
+    "gpt-5.6-sol": Pricing(4e-6, 20e-6),
+    "gpt-6-astra": Pricing(10e-6, 50e-6),
 }
 
 KNOWN_MODELS = sorted(USD_PER_TOKEN.keys())

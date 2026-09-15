@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+
 from libopenai.auth import initialize_client
 
 client = initialize_client()

@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
-import os
 import json
+import os
 import queue
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import (
-    Scrollbar,
-    END,
-    RIGHT,
-    Y,
-    LEFT,
     BOTH,
-    Text,
+    END,
+    LEFT,
+    RIGHT,
     Button,
+    Scrollbar,
+    Text,
+    Y,
     filedialog,
+    simpledialog,
+    ttk,
 )
 from tkinter import font as tkfont
-from tkinter import simpledialog
-from tkinter import ttk
 
-from tkinterweb import HtmlFrame  # pyright: ignore[reportAttributeAccessIssue]
 from mistletoe import markdown
 from mistletoe.contrib.pygments_renderer import PygmentsRenderer
+from tkinterweb import HtmlFrame  # pyright: ignore[reportAttributeAccessIssue]
 
 from libopenai.auth import initialize_client
-from libopenai.core import GptCore
-from libopenai.vectors import Vectors
 from libopenai.constants import (
     CONVERSATION_NAMES_FILE,
     DATA_DIRECTORY,
@@ -34,6 +32,7 @@ from libopenai.constants import (
     IMAGE_EXTENSIONS,
     USER_DATA_EXTENSIONS,
 )
+from libopenai.core import GptCore
 from libopenai.pricing import KNOWN_MODELS
 from libopenai.validation import (
     IMAGE_FORMAT_DEFAULT,
@@ -49,6 +48,7 @@ from libopenai.validation import (
     validate_image_quality,
     validate_image_size,
 )
+from libopenai.vectors import Vectors
 
 TEMPORARY_VECTOR_STORE = "(temporary)"
 
@@ -936,7 +936,7 @@ class JsonViewerApp(tk.Tk):
         def do_fetch():
             try:
                 models = GptCore(client=self.client).list_models()
-            except Exception:
+            except Exception:  # noqa: BLE001 - backend-agnostic best-effort fetch
                 models = KNOWN_MODELS
 
             def update():
@@ -961,7 +961,7 @@ class JsonViewerApp(tk.Tk):
         def do_fetch():
             try:
                 stores = Vectors(self.client).list_vector_stores()
-            except Exception:
+            except Exception:  # noqa: BLE001 - backend-agnostic best-effort fetch
                 stores = []
 
             def update():

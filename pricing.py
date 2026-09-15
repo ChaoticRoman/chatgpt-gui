@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 
-from libopenai.pricing import KNOWN_MODELS, USD_PER_TOKEN
 from libopenai.constants import DEFAULT_MODEL
+from libopenai.pricing import KNOWN_MODELS, USD_PER_TOKEN
 
 
 def parse_tokens(value):

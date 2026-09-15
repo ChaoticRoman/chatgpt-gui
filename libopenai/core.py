@@ -1,18 +1,18 @@
 import base64
+import json
 import os
+import sys
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
-import json
-import sys
 from datetime import datetime as dt
+from datetime import timezone
+from pathlib import Path
 from pprint import pprint
 
-from .pricing import USD_PER_TOKEN, USD_PER_WEB_SEARCH_CALL
-from .constants import DEFAULT_MODEL, DATA_DIRECTORY
 from .auth import initialize_client
+from .constants import DATA_DIRECTORY, DEFAULT_MODEL
 from .files import Files
-from .vectors import Vectors
+from .pricing import USD_PER_TOKEN, USD_PER_WEB_SEARCH_CALL
 from .validation import (
     IMAGE_FORMAT_DEFAULT,
     IMAGE_MODEL_DEFAULT,
@@ -23,6 +23,7 @@ from .validation import (
     validate_image_quality,
     validate_image_size,
 )
+from .vectors import Vectors
 
 
 def _extract_sources(response):
@@ -77,7 +78,7 @@ class GptCore:
         image_model=IMAGE_MODEL_DEFAULT,
         debug=False,
         client=None,
-    ):  # noqa: A002 (input is a callback, not the builtin)
+    ):
         self.input = input
         self.output = output
         self.model = model
@@ -98,7 +99,7 @@ class GptCore:
         self._carryover_image_paths = []
         self.output_image_index = 0
 
-        timestamp = dt.now().replace(microsecond=0).isoformat()
+        timestamp = dt.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.conversation_id = f"{timestamp}-{uuid.uuid4().hex[:6]}"
         os.makedirs(DATA_DIRECTORY, exist_ok=True)
         self.file = DATA_DIRECTORY / f"{self.conversation_id}.json"
@@ -187,7 +188,7 @@ class GptCore:
                 {"type": "file_search", "vector_store_ids": [self._vector_store_id]}
             )
 
-        kwargs = dict(model=self.model, input=self.messages)
+        kwargs = {"model": self.model, "input": self.messages}
         if tools:
             kwargs["tools"] = tools
         if includes:

@@ -40,6 +40,7 @@ def run_cli(
         text=True,
         timeout=timeout,
         env=env,
+        check=False,
     )
     return result.stdout, result.stderr, result.returncode
 
@@ -96,19 +97,19 @@ class TestSingleTurn:
     """Single-turn conversations: one prompt then exit."""
 
     def test_basic_response(self):
-        stdout, stderr, rc = run_cli("What is 2+2? Answer with just the number.\n")
+        stdout, _stderr, rc = run_cli("What is 2+2? Answer with just the number.\n")
         assert rc == 0
         assert get_responses(stdout)[0] == "4"
 
     def test_exit_q(self):
         """Typing 'q' should exit cleanly with no API call."""
-        stdout, stderr, rc = run_cli("q\n")
+        _stdout, stderr, rc = run_cli("q\n")
         assert rc == 0
         # No response content expected
         assert "Input tokens" not in stderr
 
     def test_exit_exit(self):
-        stdout, stderr, rc = run_cli("exit\n")
+        _stdout, stderr, rc = run_cli("exit\n")
         assert rc == 0
         assert "Input tokens" not in stderr
 
@@ -123,7 +124,7 @@ class TestMultiturn:
             "What is our word? Reply with just the word.\n"
             "q\n"
         )
-        stdout, stderr, rc = run_cli(stdin_text)
+        stdout, _stderr, rc = run_cli(stdin_text)
         assert rc == 0
         assert get_responses(stdout)[1] == "banana"
 
@@ -135,7 +136,7 @@ class TestMultiturn:
             "What is x+y? Reply with just the number.\n"
             "q\n"
         )
-        stdout, stderr, rc = run_cli(stdin_text)
+        stdout, _stderr, rc = run_cli(stdin_text)
         assert rc == 0
         assert get_responses(stdout)[2] == "10"
 
@@ -146,7 +147,7 @@ class TestMultiturn:
             "What is my name? Reply with just the name.\n"
             "q\n"
         )
-        stdout, stderr, rc = run_cli(stdin_text)
+        stdout, _stderr, rc = run_cli(stdin_text)
         assert rc == 0
         assert get_responses(stdout)[1] == "zephyrine"
 
@@ -174,7 +175,7 @@ class TestPrepend:
             f.flush()
             try:
                 stdin_text = "What is the password? Reply with just the word.\n"
-                stdout, stderr, rc = run_cli(
+                stdout, _stderr, rc = run_cli(
                     stdin_text,
                     extra_args=["-b", "-pf", f.name],
                 )
@@ -185,7 +186,7 @@ class TestPrepend:
 
     def test_prepend_string_adds_context(self):
         stdin_text = "What is my name? Reply with just the name.\n"
-        stdout, stderr, rc = run_cli(
+        stdout, _stderr, rc = run_cli(
             stdin_text,
             extra_args=["-b", "-p", "My name is Gandalf."],
         )
@@ -203,7 +204,7 @@ class TestPrepend:
                     "How many times did the context mention Peter before? Reply with just number.\n"
                     "q\n"
                 )
-                stdout, stderr, rc = run_cli(
+                stdout, _stderr, rc = run_cli(
                     stdin_text,
                     extra_args=["-pf", f.name],
                 )
@@ -221,14 +222,14 @@ class TestMultilineInput:
     def test_multiline_basic(self):
         # In multiline mode, lines are collected until "SEND"
         stdin_text = "What is\n2+2?\nAnswer with just the number.\nSEND\nq\n"
-        stdout, stderr, rc = run_cli(stdin_text, extra_args=["-m"])
+        stdout, _stderr, rc = run_cli(stdin_text, extra_args=["-m"])
         assert rc == 0
         assert get_responses(stdout)[0] == "4"
 
     def test_multiline_preserves_newlines(self):
         """Multiline input should preserve newlines in the prompt."""
         stdin_text = "One.\n\nTwo.\n\nCount non-empty lines above. Reply just the count.\nSEND\nq\n"
-        stdout, stderr, rc = run_cli(stdin_text, extra_args=["-m"])
+        stdout, _stderr, rc = run_cli(stdin_text, extra_args=["-m"])
         assert rc == 0
         assert int(get_responses(stdout)[0]) > 1
 
@@ -238,7 +239,7 @@ class TestModelFlag:
 
     def test_invalid_model(self):
         """Prompting with invalid model name should fail."""
-        stdout, stderr, rc = run_cli(
+        _stdout, stderr, rc = run_cli(
             "Say hi.\n",
             model="foo",
         )
@@ -265,7 +266,7 @@ class TestDebugMode:
 
     def test_debug_prints_to_stderr(self):
         """Debug flag should print raw response dict to stderr."""
-        stdout, stderr, rc = run_cli(
+        _stdout, stderr, rc = run_cli(
             "Say ok.\nq\n",
             extra_args=["-d"],
         )
@@ -288,17 +289,17 @@ class TestEdgeCases:
 
     def test_empty_input_exits(self):
         """EOF on empty input should exit cleanly."""
-        stdout, stderr, rc = run_cli("")
+        _stdout, _stderr, rc = run_cli("")
         assert rc == 0
 
     def test_unicode_input(self):
-        stdout, stderr, rc = run_cli("Is \u00e9 a vowel? Reply just yes.\n")
+        _stdout, _stderr, rc = run_cli("Is \u00e9 a vowel? Reply just yes.\n")
         assert rc == 0
         # Just verify no crash with unicode
 
     def test_very_short_prompt(self):
         """Single character prompt."""
-        stdout, stderr, rc = run_cli(
+        stdout, _stderr, rc = run_cli(
             "Hi\nq\n",
         )
         assert rc == 0
@@ -306,7 +307,7 @@ class TestEdgeCases:
 
     def test_pricing_info_displayed(self):
         """Verify pricing info appears in stderr."""
-        stdout, stderr, rc = run_cli("Say ok.\nq\n")
+        _stdout, stderr, rc = run_cli("Say ok.\nq\n")
         assert rc == 0
         assert "Input tokens:" in stderr
 
@@ -356,7 +357,7 @@ class TestImageInput:
 
     def test_multiple_images(self):
         """-i accepts multiple files; all uploaded and cleaned up."""
-        stdout, stderr, rc = run_cli(
+        _stdout, stderr, rc = run_cli(
             "Reply just ok.",
             extra_args=["-b", "-i", "tests/test.png", "tests/test.png"],
             extra_env={"CHATGPT_CLI_LOG_UPLOAD_IDS": "1"},
@@ -373,7 +374,7 @@ class TestImageGeneration:
 
     def test_image_generation_saves_file(self, tmp_path):
         """-ig produces an image on disk and embeds its path in the reply."""
-        stdout, stderr, rc = run_cli(
+        stdout, _stderr, rc = run_cli(
             "Generate a plain solid red square. No text.",
             extra_args=["-b", "-ig"],
             timeout=240,
@@ -883,7 +884,7 @@ class TestAllModelsSmokeTest:
 
     @pytest.mark.parametrize("model", KNOWN_MODELS)
     def test_model_responds(self, model):
-        stdout, stderr, rc = run_cli(
+        stdout, _stderr, rc = run_cli(
             "Say ok.",
             extra_args=["-b"],
             model=model,

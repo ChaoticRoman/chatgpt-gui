@@ -1,14 +1,23 @@
-.PHONY: all lint format test xtest importcheck typecheck
+.PHONY: all lint format test xtest importcheck typecheck ruffversion
+
+# Keep in sync with RUFF_VERSION in .github/workflows/lint.yml
+RUFF_VERSION := 0.16.6
 
 all: lint xtest
 
-lint:
+ruffversion:
+	@ruff --version | grep -qxF "ruff $(RUFF_VERSION)" || { \
+		echo "ruff $(RUFF_VERSION) required, found: $$(ruff --version)"; \
+		echo "install it with: pip install 'ruff==$(RUFF_VERSION)'"; \
+		exit 1; }
+
+lint: ruffversion
 	ruff check .
 	ruff format --diff .
 	$(MAKE) importcheck
 	$(MAKE) typecheck
 
-format:
+format: ruffversion
 	ruff format .
 
 importcheck:

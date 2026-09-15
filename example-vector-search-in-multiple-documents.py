@@ -30,7 +30,8 @@ pdf_paths = [
 
 uploaded_file_ids = []
 for path in pdf_paths:
-    file_response = client.files.create(file=open(path, "rb"), purpose="assistants")
+    with open(path, "rb") as f:
+        file_response = client.files.create(file=f, purpose="assistants")
     client.vector_stores.files.create(
         vector_store_id=vector_store.id,
         file_id=file_response.id,

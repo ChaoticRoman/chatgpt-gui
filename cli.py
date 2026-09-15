@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 import argparse
-from datetime import datetime, timezone
-from functools import partial
-import sys
 
 # importing readline adds history and navigation to input builtin
 import readline  # noqa F401
+import sys
+from datetime import datetime, timezone
+from functools import partial
 
 from rich.console import Console
 from rich.markdown import Markdown
 
 from libopenai import core
-from libopenai.pricing import KNOWN_MODELS
 from libopenai.constants import DEFAULT_MODEL
 from libopenai.files import Files
-from libopenai.vectors import Vectors
+from libopenai.pricing import KNOWN_MODELS
 from libopenai.validation import (
     IMAGE_FORMAT_DEFAULT,
     IMAGE_FORMATS,
@@ -25,6 +24,7 @@ from libopenai.validation import (
     IMAGE_SIZE_DEFAULT,
     validate_image_size,
 )
+from libopenai.vectors import Vectors
 
 
 def _argparse_type(validator):
